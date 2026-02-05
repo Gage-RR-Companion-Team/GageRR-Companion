@@ -15,3 +15,7 @@ Sara is the CEO of a successful tech startup that produces membranes for gas sep
 Jeanne is a process engineer. She wants to know if the change in her experiment is due to actual changes in the experiment or due to the measurement error. She wants to be able to determine this quickly to move further into the experiment, and to be able to tell if the error due to measuring is small enough. She is very technical, however has no clue on gage testing.
 
 Bobart is a manager. He does not want to get deep into what goes into Gage R&R testing, he just wants to know how to fix it. He wants to be able to access a Gage R&R test somehow and have it tell him root causes of why error is so high (or not high). He is very non-technical and does not know about gage testing.
+
+Robert is a technician. He was assigned by his boss to identify the variability of his viscosity measurement. He wants to know how to test his viscometer to see if he can trust the readout he gets from his instrument. He wants to know exactly what to do for his test, and wants it to be easy. He is fresh out of undergrad with a mechanical engineering degree, but doesn't have any work experience.
+
+Stephanie is a quality engineer at a large company. She knows that she has to carry out a nested Gage R&R to quantify the measurement error of her system. She loves to use Minitab, but her company deemed it wasn't worth the price. She is fluent in Minitab functionality, and really doesn't want to have to learn another new software. She has 10 years work experienve as a QC engineer for an aerospace.
