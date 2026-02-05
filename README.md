@@ -10,5 +10,5 @@ This program is meant to act as a tool to assist in developing Gage R&R studies 
 ### Additional Gage R&R Documention:
 Below are additional resources for learning about Gage R&R.
 
-ASQ - https://asq.org/quality-resources/gage-repeatability?srsltid=AfmBOoqWP1c-bsj5TwBh-o1X-QN3fSPi8bCMTsaI1BenUD8FpZA1H4h0
-Six Sigma - https://sixsigmastudyguide.com/gage-repeatability-and-reproducibility-rr/ 
+1. ASQ - https://asq.org/quality-resources/gage-repeatability?srsltid=AfmBOoqWP1c-bsj5TwBh-o1X-QN3fSPi8bCMTsaI1BenUD8FpZA1H4h0
+2. Six Sigma - https://sixsigmastudyguide.com/gage-repeatability-and-reproducibility-rr/ 
