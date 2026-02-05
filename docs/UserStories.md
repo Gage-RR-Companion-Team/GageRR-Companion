@@ -21,3 +21,5 @@ Robert is a technician. He was assigned by his boss to identify the variability 
 Stephanie is a quality engineer at a large company. She knows that she has to carry out a nested Gage R&R to quantify the measurement error of her system. She loves to use Minitab, but her company deemed it wasn't worth the price. She is fluent in Minitab functionality, and really doesn't want to have to learn another new software. She has 10 years work experienve as a QC engineer for an aerospace.
 
 Steve is a manufacturing engineer. He uses a quality control test whether his product is up to spec or not. He wants to identify the variability in his QC test to assess if he can trust its result. He wants a test to assess the different sources of error, and wants to know all the details. He is very technically savvy, and is familiar with Gage R&R. 
+
+May is the head of an engineering team. She is incharge of selecting a new tool to use to measure something. She has multiple options and wants the one that will be most accurate overall. She wants a quick, easy, and simple interface that tells her the overall varibaility. She has a technical background and used to be an engineer
