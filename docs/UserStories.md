@@ -12,3 +12,6 @@ Abby is a process engineer. There is a new tool being implemented and he wants t
 
 Sara is the CEO of a successful tech startup that produces membranes for gas separations. Recently, her membranes have been reported to have variable thickness. Since she just brought on 5 new production technicians, she wants to assess the process variation and parse out if its a result of poor reproducibility between operators, or poor repeatibility of the thickness measurement system. She wants to get to the bottom of this as fast as possible, and wants it to be easy. She has an advanced degree in engineering.
 
+Jeanne is a process engineer. She wants to know if the change in her experiment is due to actual changes in the experiment or due to the measurement error. She wants to be able to determine this quickly to move further into the experiment, and to be able to tell if the error due to measuring is small enough. She is very technical, however has no clue on gage testing.
+
+Bobart is a manager. He does not want to get deep into what goes into Gage R&R testing, he just wants to know how to fix it. He wants to be able to access a Gage R&R test somehow and have it tell him root causes of why error is so high (or not high). He is very non-technical and does not know about gage testing.
