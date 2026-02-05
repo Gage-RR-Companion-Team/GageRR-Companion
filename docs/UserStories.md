@@ -10,4 +10,5 @@ Paul is an R&D engineer for a small company where he is the sole user of an inst
 
 Abby is a process engineer. There is a new tool being implemented and he wants to see how much reliable the new tool is compared to the old method. He wants a quick and easy method to tell him. He is an engineer with a lot of hands on experience.
 
+Sara is the CEO of a successful tech startup that produces membranes for gas separations. Recently, her membranes have been reported to have variable thickness. Since she just brought on 5 new production technicians, she wants to assess the process variation and parse out if its a result of poor reproducibility between operators, or poor repeatibility of the thickness measurement system. She wants to get to the bottom of this as fast as possible, and wants it to be easy. She has an advanced degree in engineering.
 
