@@ -1,4 +1,4 @@
-from io import load_gage_rr_data
+from gage_rr_io import load_gage_rr_data
 from compute import ComputeGageRR
 
 """
