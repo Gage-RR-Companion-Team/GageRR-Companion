@@ -13,7 +13,8 @@ def load_gage_rr_data(
     part_col="Part",
     trial_col="Trial",
     value_col="Value",
-    method_col=None
+    method_col=None,
+    is_path=True
 ):
     """
     Loads and validates Gage R&R data in long format.
@@ -46,8 +47,9 @@ def load_gage_rr_data(
     # -------------------------
     # File existence check
     # -------------------------
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"The file '{filepath}' does not exist.")
+    if is_path:
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"The file '{filepath}' does not exist.")
 
     # -------------------------
     # Load CSV
