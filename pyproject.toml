@@ -6,11 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "BSD-3-Clause"}
 authors = [
-	{name = "Henry Nguyen", email = "nguyehen@uw.edu"}
-	{name = "Logan Sayyadi"}
-	{name = "Mason Keller"}
+	{name = "Henry Nguyen", email = "nguyehen@uw.edu"},
+	{name = "Logan Sayyadi", email = "lsayyadi@uw.edu"},
+	{name = "Mason Keller", email = "masonk7@uw.edu"}
 ]
 dependencies = [
-	"altair>=6.0.0"
+	"altair>=6.0.0",
 	"streamlit>=1.54.0",
 ]
