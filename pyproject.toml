@@ -1,0 +1,14 @@
+[project]
+name = "gage-rr-companion"
+version = "0.1.0"
+description = "This program is meant to act as a tool to assist in developing Gage R&R studies in an efficient manner."
+requires-python = ">=3.12"
+license = {text = "BSD-3-Clause"}
+authors = [
+	{name = "Henry Nguyen", email = "nguyehen@uw.edu"}
+	{name = "Logan Sayyadi"}
+	{name = "Mason Keller"}
+]
+dependencies = [
+	
+]
