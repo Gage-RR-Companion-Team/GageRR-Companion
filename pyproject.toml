@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "gage-rr-companion"
 version = "0.1.0"
@@ -13,4 +17,9 @@ authors = [
 dependencies = [
 	"altair>=6.0.0",
 	"streamlit>=1.54.0",
+	"pandas>=2.0.0",
+	"numpy>=1.24.0",
 ]
+
+[tool.setuptools.packages.find]
+where = ["src"]

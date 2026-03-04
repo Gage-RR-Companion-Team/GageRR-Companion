@@ -1,5 +1,5 @@
-from gage_rr_io import load_gage_rr_data
-from compute import ComputeGageRR
+from gage_rr_companion.gage_rr_io import load_gage_rr_data
+from gage_rr_companion.compute import ComputeGageRR
 
 """
 This script serves as a test for the Gage R&R analysis code I just wrote. It loads a dataset,
@@ -7,7 +7,7 @@ This script serves as a test for the Gage R&R analysis code I just wrote. It loa
  """
 
 # Load your dataset
-df = load_gage_rr_data("measurements.csv")
+df = load_gage_rr_data("data/measurements.csv")
 
 # Run analysis
 results = ComputeGageRR(df)

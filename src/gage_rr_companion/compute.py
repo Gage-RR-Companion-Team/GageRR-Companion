@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
 
-from anova import ComputeANOVA
-from variance import ComputeVarianceComponents
-from tables import GenerateGageRRTable
-from stats import ComputeOperatorStats
+from .anova import ComputeANOVA
+from .variance import ComputeVarianceComponents
+from .tables import GenerateGageRRTable
+from .stats import ComputeOperatorStats
 
 
 def ComputeGageRR(

@@ -1,0 +1,17 @@
+LICENSE
+README.md
+pyproject.toml
+src/GageRR-Companion/__init__.py
+src/GageRR-Companion/anova.py
+src/GageRR-Companion/app.py
+src/GageRR-Companion/compute.py
+src/GageRR-Companion/gage_rr_io.py
+src/GageRR-Companion/stats.py
+src/GageRR-Companion/tables.py
+src/GageRR-Companion/variance.py
+src/gage_rr_companion.egg-info/PKG-INFO
+src/gage_rr_companion.egg-info/SOURCES.txt
+src/gage_rr_companion.egg-info/dependency_links.txt
+src/gage_rr_companion.egg-info/requires.txt
+src/gage_rr_companion.egg-info/top_level.txt
+src/tests/test_gage_rr.py
