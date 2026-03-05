@@ -1,6 +1,6 @@
 import streamlit as st
-from .compute import ComputeGageRR
-from .gage_rr_io import load_gage_rr_data
+from gage_rr_companion.compute import ComputeGageRR
+from gage_rr_companion.gage_rr_io import load_gage_rr_data
 st.set_page_config(page_title='Gage R&R Companion', layout='centered')
 
 st.title('Gage R&R Companion')
