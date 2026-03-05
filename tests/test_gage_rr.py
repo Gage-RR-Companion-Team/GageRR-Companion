@@ -7,7 +7,7 @@ This script serves as a test for the Gage R&R analysis code I just wrote. It loa
  """
 
 # Load your dataset
-df = load_gage_rr_data("data/measurements.csv")
+df = load_gage_rr_data("../data/measurements.csv")
 
 # Run analysis
 results = ComputeGageRR(df)
