@@ -1,158 +1,91 @@
-import json
-import sys
-from typing import Any, Dict
+from __future__ import annotations
 
+import json
 import pandas as pd
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (
-    QApplication,
-    QFileDialog,
-    QHBoxLayout,
-    QLabel,
-    QMainWindow,
-    QMessageBox,
-    QPushButton,
-    QTabWidget,
-    QTextEdit,
-    QVBoxLayout,
-    QWidget,
-    QTableWidget,
-    QTableWidgetItem,
+from shiny import App, Inputs, Outputs, Session, reactive, render, ui
+
+from gage_rr_companion.compute import ComputeGageRR
+from gage_rr_companion.gage_rr_io import load_gage_rr_data
+
+
+app_ui = ui.page_fluid(
+    ui.h2("Gage R&R Companion"),
+    ui.input_file(
+        "data",
+        "Upload your Gage R&R data (CSV format)",
+        accept=[".csv"],
+        multiple=False,
+    ),
+    ui.hr(),
+    ui.output_ui("results_ui"),
 )
 
-from .compute import ComputeGageRR
-from .gage_rr_io import load_gage_rr_data
 
+def server(input: Inputs, output: Outputs, session: Session):
 
-def dataframe_to_tablewidget(df: pd.DataFrame) -> QTableWidget:
-    """Convert a pandas DataFrame into a read-only QTableWidget."""
-    table = QTableWidget()
-    table.setRowCount(len(df))
-    table.setColumnCount(len(df.columns))
-    table.setHorizontalHeaderLabels([str(c) for c in df.columns])
+    @reactive.calc
+    def results():
+        files = input.data()
+        if not files:
+            return None
 
-    for r in range(len(df)):
-        for c in range(len(df.columns)):
-            val = df.iat[r, c]
-            item = QTableWidgetItem("" if pd.isna(val) else str(val))
-            # read-only
-            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            table.setItem(r, c, item)
+        path = files[0]["datapath"]  # temp file on disk
+        df = load_gage_rr_data(path, is_path=True)
+        return ComputeGageRR(df)
 
-    table.resizeColumnsToContents()
-    table.resizeRowsToContents()
-    return table
+    @output
+    @render.ui
+    def results_ui():
+        res = results()
+        if res is None:
+            return ui.p("Upload a CSV to see results.")
 
+        return ui.TagList(
+            ui.h4("ANOVA Table"),
+            ui.output_data_frame("anova_tbl"),
 
-class MainWindow(QMainWindow):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setWindowTitle("Gage R&R Companion")
-        self.setMinimumSize(900, 600)
+            ui.h4("Variance Components"),
+            ui.output_data_frame("var_tbl"),
 
-        root = QWidget()
-        self.setCentralWidget(root)
-        layout = QVBoxLayout(root)
+            ui.h4("Gage R&R Table"),
+            ui.output_data_frame("grr_tbl"),
 
-        # Top bar
-        top = QHBoxLayout()
-        layout.addLayout(top)
+            ui.h4("Operator Statistics"),
+            ui.output_data_frame("ops_tbl"),
 
-        self.status_label = QLabel("Upload your Gage R&R data (CSV format)")
-        top.addWidget(self.status_label)
-
-        self.upload_btn = QPushButton("Choose CSV…")
-        self.upload_btn.clicked.connect(self.choose_csv)
-        top.addWidget(self.upload_btn)
-
-        # Tabs
-        self.tabs = QTabWidget()
-        layout.addWidget(self.tabs)
-
-        self.tab_anova = QWidget()
-        self.tab_var = QWidget()
-        self.tab_grr = QWidget()
-        self.tab_ops = QWidget()
-        self.tab_summary = QWidget()
-
-        self.tabs.addTab(self.tab_anova, "ANOVA Table")
-        self.tabs.addTab(self.tab_var, "Variance Components")
-        self.tabs.addTab(self.tab_grr, "Gage R&R Table")
-        self.tabs.addTab(self.tab_ops, "Operator Statistics")
-        self.tabs.addTab(self.tab_summary, "Summary Metrics")
-
-        self._init_table_tab(self.tab_anova)
-        self._init_table_tab(self.tab_var)
-        self._init_table_tab(self.tab_grr)
-        self._init_table_tab(self.tab_ops)
-        self._init_summary_tab(self.tab_summary)
-
-        self.summary_text: QTextEdit = self.tab_summary.findChild(QTextEdit)
-
-    def _init_table_tab(self, tab: QWidget) -> None:
-        lay = QVBoxLayout(tab)
-        placeholder = QLabel("No data loaded yet.")
-        placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lay.addWidget(placeholder)
-
-    def _init_summary_tab(self, tab: QWidget) -> None:
-        lay = QVBoxLayout(tab)
-        txt = QTextEdit()
-        txt.setReadOnly(True)
-        txt.setPlaceholderText("Summary metrics will appear here.")
-        lay.addWidget(txt)
-
-    def choose_csv(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select Gage R&R CSV",
-            "",
-            "CSV Files (*.csv);;All Files (*)",
+            ui.h4("Summary Metrics"),
+            ui.output_text_verbatim("summary_json"),
         )
-        if not path:
-            return
 
-        try:
-            df = load_gage_rr_data(path, is_path=True)
-            results: Dict[str, Any] = ComputeGageRR(df)
+    @output
+    @render.data_frame
+    def anova_tbl():
+        res = results()
+        return render.DataGrid(res["anova_table"]) if res else render.DataGrid(pd.DataFrame())
 
-            self.status_label.setText(f"Loaded: {path}")
-            self.populate_results(results)
+    @output
+    @render.data_frame
+    def var_tbl():
+        res = results()
+        return render.DataGrid(res["variance_components"]) if res else render.DataGrid(pd.DataFrame())
 
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Error",
-                f"Failed to load or compute results.\n\n{e}",
-            )
+    @output
+    @render.data_frame
+    def grr_tbl():
+        res = results()
+        return render.DataGrid(res["gage_rr_table"]) if res else render.DataGrid(pd.DataFrame())
 
-    def _set_table_tab(self, tab: QWidget, df: pd.DataFrame) -> None:
-        lay = tab.layout()
-        # Clear existing widgets
-        while lay.count():
-            item = lay.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.deleteLater()
+    @output
+    @render.data_frame
+    def ops_tbl():
+        res = results()
+        return render.DataGrid(res["operator_stats"]) if res else render.DataGrid(pd.DataFrame())
 
-        lay.addWidget(dataframe_to_tablewidget(df))
-
-    def populate_results(self, results: Dict[str, Any]) -> None:
-        self._set_table_tab(self.tab_anova, results["anova_table"])
-        self._set_table_tab(self.tab_var, results["variance_components"])
-        self._set_table_tab(self.tab_grr, results["gage_rr_table"])
-        self._set_table_tab(self.tab_ops, results["operator_stats"])
-
-        summary = results.get("summary_metrics", {})
-        self.summary_text.setPlainText(json.dumps(summary, indent=2))
+    @output
+    @render.text
+    def summary_json():
+        res = results()
+        return "" if not res else json.dumps(res.get("summary_metrics", {}), indent=2)
 
 
-def main() -> None:
-    app = QApplication(sys.argv)
-    win = MainWindow()
-    win.show()
-    sys.exit(app.exec())
-
-
-if __name__ == "__main__":
-    main()
+app = App(app_ui, server)
