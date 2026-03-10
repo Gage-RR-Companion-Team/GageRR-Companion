@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gage-rr-companion"
+name = "gage_rr_companion"
 version = "0.1.0"
 description = "This program is meant to act as a tool to assist in developing Gage R&R studies in an efficient manner."
 readme = "README.md"
