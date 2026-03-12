@@ -1,2 +1,1 @@
-GageRR-Companion
-tests
+gage_rr_companion
