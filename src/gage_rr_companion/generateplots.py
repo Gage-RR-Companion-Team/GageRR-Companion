@@ -13,7 +13,7 @@ import pandas as pd
 import altair as alt
 
 
-def GenerateGageRRPlots(
+def generateplots(
     df,
     gage_rr_results,
     operator_col="Operator",
