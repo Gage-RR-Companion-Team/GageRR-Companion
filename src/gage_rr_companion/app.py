@@ -18,7 +18,7 @@ st.markdown(
     Gage R&R table, operator statistics, and summary metrics for you.
     
     **Instructions:**
-    1. Prepare your data in a CSV file with the following columns: `Part`, `Operator`, `Measurement`.
+    1. Prepare your data in a CSV file with the following columns: `Operator`, `Part`, `Trial`, `Measurement`.
     2. Click on the "Upload your Gage R&R data" button below to upload your CSV file.
     3. View the results in the respective sections below.
     
