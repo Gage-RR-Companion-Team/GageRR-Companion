@@ -66,29 +66,25 @@ def generateplots(
     # -----------------------------
     # X-bar Control Chart
     # -----------------------------
-    xbar_chart = (
+    xbar_chart_points = (
         alt.Chart(xbar_df)
         .mark_point(filled=True, size=60)
         .encode(
             x=alt.X("Subgroup:O", title="Subgroup", axis=alt.Axis(labelAngle=0, labelColor="black")),
-            y=alt.Y("Xbar:Q", title="Mean Measurement", scale=alt.Scale(zero=False), axis=alt.Axis(ticks=True)),
+            y=alt.Y("Xbar:Q", title="Mean Measurement", scale=alt.Scale(zero=False), axis=alt.Axis(ticks=False, labelColor="black")),
             shape=alt.Shape(f"{operator_col}:N", title="Operator"),
             color=alt.Color(f"{operator_col}:N", title="Operator"),
             tooltip=[operator_col, part_col, "Xbar"]
         )
     )
 
-    # Control lines
     xbar_lines = alt.layer(
-        # Average
         alt.Chart(pd.DataFrame({"y":[avg_xbar]})).mark_rule(color="grey", strokeDash=[4,4], size=2).encode(y="y:Q"),
-        # UCL
         alt.Chart(pd.DataFrame({"y":[ucl_xbar]})).mark_rule(color="red", size=2).encode(y="y:Q"),
-        # LCL
         alt.Chart(pd.DataFrame({"y":[lcl_xbar]})).mark_rule(color="red", size=2).encode(y="y:Q")
     )
 
-    xbar_chart = alt.layer(xbar_chart, xbar_lines).properties(
+    xbar_chart = alt.layer(xbar_chart_points, xbar_lines).properties(
         title="X-Bar Control Chart"
     ).configure_view(
         stroke="black"
@@ -109,7 +105,7 @@ def generateplots(
         .mark_point(filled=True, size=60)
         .encode(
             x=alt.X("Subgroup:O", title="Subgroup", axis=alt.Axis(labelAngle=0, labelColor="black")),
-            y=alt.Y("Range:Q", title="Range", scale=alt.Scale(zero=False)),
+            y=alt.Y("Range:Q", title="Range", scale=alt.Scale(zero=False), axis=alt.Axis(labelColor="black")),
             shape=alt.Shape(f"{operator_col}:N", title="Operator"),
             color=alt.Color(f"{operator_col}:N", title="Operator"),
             tooltip=[operator_col, part_col, "Range"]
@@ -117,11 +113,8 @@ def generateplots(
     )
 
     r_lines = alt.layer(
-        # Average
         alt.Chart(pd.DataFrame({"y":[avg_r]})).mark_rule(color="grey", strokeDash=[4,4], size=2).encode(y="y:Q"),
-        # UCL
         alt.Chart(pd.DataFrame({"y":[ucl_r]})).mark_rule(color="red", size=2).encode(y="y:Q"),
-        # LCL
         alt.Chart(pd.DataFrame({"y":[lcl_r]})).mark_rule(color="red", size=2).encode(y="y:Q")
     )
 
@@ -139,7 +132,7 @@ def generateplots(
         .mark_boxplot()
         .encode(
             x=alt.X(f"{operator_col}:N", title="Operator"),
-            y=alt.Y(f"{value_col}:Q", title="Measurement Value", scale=alt.Scale(zero=False))
+            y=alt.Y(f"{value_col}:Q", title="Measurement Value", scale=alt.Scale(zero=False), axis=alt.Axis(labelColor="black"))
         )
         .properties(title="Operator Measurement Distribution")
         .configure_view(stroke="black")
@@ -154,7 +147,7 @@ def generateplots(
         .mark_bar()
         .encode(
             x=alt.X("Source:N", title="Variance Source"),
-            y=alt.Y("PercentContribution:Q", title="Percent Contribution", scale=alt.Scale(zero=False)),
+            y=alt.Y("PercentContribution:Q", title="Percent Contribution", scale=alt.Scale(zero=False), axis=alt.Axis(labelColor="black")),
         )
         .properties(title="Variance Contribution")
         .configure_view(stroke="black")
