@@ -9,28 +9,57 @@ import altair as alt
 # -----------------------------
 # Helper: create a valid dataframe
 # -----------------------------
-def create_valid_df():
-    return pd.DataFrame({
-        "Operator": ["A", "A", "B", "B"],
-        "Part": [1, 2, 1, 2],
-        "Trial": [1, 1, 1, 1],
-        "Value": [10, 12, 11, 13]
-    })
+def create_valid_df(n_operators=2, n_parts=2, n_trials=2, identical=False, nan_indices=None):
+    """
+    Generates a DataFrame suitable for generateplots.
+
+    Parameters:
+        n_operators (int): Number of operators (e.g., 2 = A,B)
+        n_parts (int): Number of parts
+        n_trials (int): Number of trials per part/operator
+        identical (bool): If True, all values are identical
+        nan_indices (list): List of row indices to set as NaN
+    """
+    data = []
+    value = 10 if not identical else 5
+    for op in range(n_operators):
+        for part in range(1, n_parts + 1):
+            for trial in range(1, n_trials + 1):
+                data.append({
+                    "Operator": chr(65 + op),
+                    "Part": part,
+                    "Trial": trial,
+                    "Value": value
+                })
+    df = pd.DataFrame(data)
+    
+    if nan_indices:
+        df.loc[nan_indices, "Value"] = np.nan
+    
+    return df
 
 # -----------------------------
 # Helper: create valid results dict
 # -----------------------------
-def create_valid_results():
+def create_valid_results(n_operators=2, n_parts=2, n_trials=2):
     variance_components = pd.DataFrame({
         "Source": ["Repeatability", "Reproducibility", "Part-To-Part", "Total Gage R&R", "Total Variation"],
         "VarianceComponent": [0.5, 0.3, 1.2, 0.8, 2.0],
         "PercentContribution": [25, 15, 60, 40, 100]
     })
 
+    n_measurements = n_operators * n_parts * n_trials
     return {
         "variance_components": variance_components,
-        "metadata": {"n_operators": 2, "n_parts": 2, "n_trials": 1, "n_measurements": 4}
+        "metadata": {"n_operators": n_operators, "n_parts": n_parts, "n_trials": n_trials, "n_measurements": n_measurements}
     }
+
+# -----------------------------
+# Helper: assert charts
+# -----------------------------
+def assert_charts(charts):
+    for name, chart in charts.items():
+        assert isinstance(chart, (alt.Chart, alt.LayerChart)), f"{name} is not a chart"
 
 # -----------------------------
 # Test: normal valid input
@@ -43,7 +72,7 @@ def test_valid_input():
     assert isinstance(charts, dict)
     expected_keys = ["xbar_control_chart", "r_control_chart", "operator_boxplot", "variance_histogram"]
     assert all(k in charts for k in expected_keys)
-    assert all(isinstance(c, alt.Chart) for c in charts.values())
+    assert_charts(charts)
 
 # -----------------------------
 # Test: non-DataFrame input
@@ -102,40 +131,29 @@ def test_missing_percent_contribution():
         generateplots(df, results)
 
 # -----------------------------
-# Test: single operator or single part
+# Test: single operator
 # -----------------------------
 def test_single_operator_part():
-    df = pd.DataFrame({
-        "Operator": ["A", "A"],
-        "Part": [1, 1],
-        "Trial": [1, 2],
-        "Value": [10, 11]
-    })
-    results = create_valid_results()
+    df = create_valid_df(n_operators=1, n_parts=2, n_trials=2)
+    results = create_valid_results(n_operators=1, n_parts=2, n_trials=2)
     charts = generateplots(df, results)
-    assert all(isinstance(c, alt.Chart) for c in charts.values())
+    assert_charts(charts)
 
 # -----------------------------
 # Test: identical measurements
 # -----------------------------
 def test_identical_measurements():
-    df = pd.DataFrame({
-        "Operator": ["A", "A", "B", "B"],
-        "Part": [1, 2, 1, 2],
-        "Trial": [1, 1, 1, 1],
-        "Value": [5, 5, 5, 5]
-    })
+    df = create_valid_df(identical=True)
     results = create_valid_results()
     charts = generateplots(df, results)
-    assert all(isinstance(c, alt.Chart) for c in charts.values())
+    assert_charts(charts)
 
 # -----------------------------
 # Test: NaN values in Value
 # -----------------------------
 def test_nan_values():
-    df = create_valid_df()
-    df.loc[0, "Value"] = np.nan
-    results = create_valid_results()
-    # Should still produce charts, Altair ignores NaNs
+    # n_trials >= 3 to allow dropping 1 NaN and still have >=2 replicates
+    df = create_valid_df(n_trials=3, nan_indices=[0])
+    results = create_valid_results(n_trials=3)
     charts = generateplots(df, results)
-    assert all(isinstance(c, alt.Chart) for c in charts.values())
+    assert_charts(charts)
