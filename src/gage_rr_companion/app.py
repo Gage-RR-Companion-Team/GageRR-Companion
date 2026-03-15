@@ -1,24 +1,37 @@
 import streamlit as st
-from gage_rr_companion.compute import ComputeGageRR
-from gage_rr_companion.gage_rr_io import load_gage_rr_data
-st.set_page_config(page_title='Gage R&R Companion', layout='centered')
 
-st.title('Gage R&R Companion')
+st.set_page_config(
+    page_title='Gage R&R Companion',
+    page_icon='📊',
+    layout='centered'
 
-data = st.file_uploader('Upload your Gage R&R data (CSV format)', type='csv')
+)
 
-if data:
-    import pandas as pd
-    df = load_gage_rr_data(data, is_path=False)
-    results = ComputeGageRR(df)
-    st.subheader('ANOVA Table')
-    st.dataframe(results['anova_table'])
-    st.subheader('Variance Components')
-    st.dataframe(results['variance_components'])
-    st.subheader('Gage R&R Table')
-    st.dataframe(results['gage_rr_table'])
-    st.subheader('Operator Statistics')
-    st.dataframe(results['operator_stats'])
-    st.subheader('Summary Metrics')
-    st.json(results['summary_metrics'])
+st.sidebar.success('Welcome to the Gage R&R Companion!')
 
+st.write("# Gage R&R Companion")
+
+st.markdown(
+    """
+    This application allows you to perform Gage R&R analysis on your measurement system data. 
+    Upload your data in CSV format, and the app will compute the ANOVA table, variance components, 
+    Gage R&R table, operator statistics, and summary metrics for you.
+    
+    **Instructions:**
+    1. Prepare your data in a CSV file with the following columns: `Part`, `Operator`, `Measurement`.
+    2. Click on the "Upload your Gage R&R data" button below to upload your CSV file.
+    3. View the results in the respective sections below.
+    
+    **Note:** Ensure that your data is properly formatted for accurate analysis.
+    """
+)
+
+col1, col2, col3 = st.columns([1, 2, 3])
+
+with col1:
+    if st.button('Analyze Results'):
+        st.switch_page('pages/1_Gage_RR_Analysis.py')
+
+with col2:
+    if st.button('Documentation'):
+        st.switch_page('pages/2_Documentation.py')
