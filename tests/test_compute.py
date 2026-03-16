@@ -74,8 +74,12 @@ def test_summary_metrics_has_required_keys():
     metrics = ComputeGageRR(balanced_df())["summary_metrics"]
     assert set(metrics.keys()) == {
         "PercentGageRR", "PercentRepeatability",
-        "PercentReproducibility", "PercentPartToPart"
+        "PercentReproducibility", "PercentPartToPart", "Classification"
     }
+
+def test_classification_valid_value():
+    metrics = ComputeGageRR(balanced_df())["summary_metrics"]
+    assert metrics["Classification"] in {"Acceptable", "Marginal", "Unacceptable"}
 
 def test_summary_metrics_sum_to_100():
     metrics = ComputeGageRR(balanced_df())["summary_metrics"]
@@ -91,7 +95,8 @@ def test_summary_metrics_gage_rr_equals_repeat_plus_repro():
 
 def test_summary_metrics_all_nonnegative():
     metrics = ComputeGageRR(balanced_df())["summary_metrics"]
-    assert all(v >= 0 for v in metrics.values())
+    numeric_values = {k: v for k, v in metrics.items() if isinstance(v, (int,float))}
+    assert all(v >= 0 for v in numeric_values.values())
 
 # --- Balanced design produces no warnings ---
 

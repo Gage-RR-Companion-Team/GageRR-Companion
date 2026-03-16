@@ -191,6 +191,15 @@ def ComputeGageRR(
         "VarianceComponent"
     ].values[0]
 
+    percent_gage_rr = gage_rr_var / total_var * 100
+
+    if percent_gage_rr < 10:
+        classification = "Acceptable"
+    elif percent_gage_rr <= 30:
+        classification = "Marginal"
+    else:
+        classification = "Unacceptable"
+
     summary_metrics = {
 
         "PercentGageRR": gage_rr_var / total_var * 100,
@@ -199,7 +208,9 @@ def ComputeGageRR(
 
         "PercentReproducibility": repro_var / total_var * 100,
 
-        "PercentPartToPart": part_var / total_var * 100
+        "PercentPartToPart": part_var / total_var * 100,
+
+        "Classification":classification
     }
 
     # Assemble results
