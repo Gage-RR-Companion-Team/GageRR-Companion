@@ -49,7 +49,7 @@ To begin analysis, the program currently requires a specifically formatted CSV o
 
 | Operator | Part | Trial | Value |
 |----------|----------|----------|----------|
-|Rows consisting of each row of data|
+|  |  |  |
 
 All values must be filled for analysis to be successful
 
