@@ -15,7 +15,7 @@ This program provides a simple tool for analyzing Gage R&R results by allowing u
 
 ![Home Page](/docs/images/home.png)
 ![Analysis Input](/docs/images/input.png)
-![Metrics Summary](/docs/images/summary_metrics/interpretation.png)
+![Metrics Summary](/docs/images/summary_metrics_interpretation.png)
 
 ## Key Features of Gage R&R Companion
 
