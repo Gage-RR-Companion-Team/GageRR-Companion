@@ -21,5 +21,8 @@ dependencies = [
 	"numpy>=1.24.0",
 ]
 
+[project.scripts]
+gage_rr_companion = "gage_rr_companion.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
