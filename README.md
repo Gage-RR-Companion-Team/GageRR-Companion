@@ -37,7 +37,7 @@ This should install all the required python dependencies into your instance
 
 To initiate the GUI for the program, from the top-level folder, run:
 
-`streamlit run src/gage_rr_companion/app.py`
+`streamlit run src/gage_rr_companion/Home.py`
 
 This will run a local web-app of the program that you can access through the link provided in the terminal.
 

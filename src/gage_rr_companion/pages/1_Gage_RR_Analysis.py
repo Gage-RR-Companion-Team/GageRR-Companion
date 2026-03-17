@@ -10,6 +10,7 @@ st.title("Gage R&R Analysis")
 st.write("Upload a CSV file to compute Gage R&R results.")
 
 data = st.file_uploader("Upload your Gage R&R data (CSV format)", type="csv")
+st.page_link("pages/2_Documentation.py", label="Need help with formatting? Check out the documentation page!")
 
 if data is not None:
     try:
