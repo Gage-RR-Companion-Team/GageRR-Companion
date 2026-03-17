@@ -2,22 +2,22 @@
 A companion tool to assist in developing and analyzing Gage R&R studies. This tool provides an interactive GUI that allows the user to import a formatted CSV of their results, then interperets and visualizes the results.
 
 
-## What is Gage R&R?
+## ❔ What is Gage R&R?
 Gage Repeatability and Reproducibility (Gage R&R) is a statistical method used in measurement systems analysis (MSA) to detemrmine how much variation in your measurements comes form the measurement system itself rather than the actual parts being measured. Essentially, it answers:
 > "Can I trust my measurement process?"
 
-## What does Gage R&R companion do?
+## 💻 What does Gage R&R companion do?
 This python program helps the user in interpreting the results of a Gage R&R study. This process often requries utilizing specialized statistical software that not everyone may have access to. 
 
 This program provides a simple tool for analyzing Gage R&R results by allowing users to upload their measurement data in a CSV format and automatically generates key statistics and plots for visualization within an interactive GUI. The goal overall is to make it easier to quickly explore Gage R&R results, understand the sources of the measurement variation, and visually inspect its measurement behavior without needed to manually construct plots or compute metrics.
 
-## Interface Images
+## 🖼️ Interface Images
 
 ![Home Page](/docs/images/home.png)
 ![Analysis Input](/docs/images/input.png)
 ![Metrics Summary](/docs/images/summary_metrics_interpretation.png)
 
-## Key Features of Gage R&R Companion
+## 🔑 Key Features of Gage R&R Companion
 
 * Upload Gage R&R Datasets from CSV
 * Compute crossed Gage R&R metrics and provides summary metrics
@@ -25,7 +25,7 @@ This program provides a simple tool for analyzing Gage R&R results by allowing u
 * Root cause analysis of the data
 * Plots consisting of respective control charts, measurement distributions, and variance contributions
 
-## Installation
+## 💾 Installation
 
 This program utilizes `python 3.12` for compatibility with streamlit and its dependencies.
 
@@ -41,7 +41,7 @@ Within the instance where the package is downloaded, you can run the following c
 
 This will run a local web-app of the program that you can access through the link provided in the terminal.
 
-## Quick Start
+## ▶️ Quick Start
 
 When opening the link provided in the terminal, you land on the landing page which provides a brief overview and buttons leading to pages for analysis as well as additional documentation. These can be accessed through the sidebar as well.
 
@@ -55,7 +55,7 @@ All values must be filled for analysis to be successful
 
 When the CSV is uploaded, analysis will begin immediately and results will be shown on the same page.
 
-## Scope
+## 🔬 Scope
 
 This program currently supports crossed Gage R&R studies utilizing ANOVA-based calculations.
 It is intended for balanced datasets, and does not replace formal review by a quality engineer in regulated settings.
