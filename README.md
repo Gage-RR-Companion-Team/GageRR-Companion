@@ -35,7 +35,7 @@ To install the required dependencies, navigate to the top-level folder of the pa
 
 This should install all the required python dependencies into your instance
 
-To initiate the GUI for the program, from the top-level folder, run:
+Within the instance where the package is downloaded, you can run the following command:
 
 `gage_rr_companion`
 
