@@ -18,12 +18,46 @@ This program provides a simple tool for analyzing Gage R&R results by allowing u
 ![Metrics Summary](/docs/images/summary_metrics_interpretation.png)
 
 ## 🔑 Key Features of Gage R&R Companion
-
 * Upload Gage R&R Datasets from CSV
-* Compute crossed Gage R&R metrics and provides summary metrics
+* Compute Gage R&R metrics across multiple study types — including Crossed, Expanded, Type 1, and Nested — and provides summary metrics for each
 * Provides interpretation of the results (acceptability)
 * Root cause analysis of the data
 * Plots consisting of respective control charts, measurement distributions, and variance contributions
+## 📐 Gage R&R Study Types
+Gage R&R encompasses several distinct study types, each suited to different measurement system scenarios. Understanding which study to use is critical to obtaining meaningful results.
+ 
+### Crossed Gage R&R
+In a crossed study, every operator measures every part, and every part is measured multiple times by each operator. This is the most common study type and is ideal when it is practical for all operators to measure all parts.
+ 
+**When to use it:**
+- The parts are non-destructive and can be re-measured
+- You have a relatively small number of parts and operators
+- You want to isolate and quantify both repeatability (equipment variation) and reproducibility (operator variation)
+- You want to assess the interaction between operators and parts
+### Expanded Gage R&R
+An expanded study builds on the crossed design by incorporating additional sources of variation beyond just operators and parts — for example, different fixtures, environmental conditions, measurement locations, or time periods. It follows a structured ANOVA approach but with an extended factor model.
+ 
+**When to use it:**
+- You suspect significant variation from sources other than the operator or the gage itself
+- You need to evaluate a measurement system across multiple sites, shifts, or setups
+- You want a more comprehensive picture of all factors contributing to measurement variation
+### Type 1 Gage Study
+A Type 1 study is a simplified, single-operator study used to evaluate only the **gage itself** — specifically its bias (accuracy) and repeatability (precision) — independent of operator influence. It is typically a preliminary study run before a full Gage R&R.
+ 
+**When to use it:**
+- You want to qualify a new piece of measurement equipment before deploying it
+- You need to isolate and understand the inherent capability and bias of the gage alone
+- You are performing an initial screening before committing to a full crossed or nested study
+- Only one operator is available, or operator variation is not a concern
+### Nested Gage R&R
+In a nested study, parts are not shared across operators — each operator measures a **unique set of parts**. This nesting structure means operator and part effects cannot be fully separated in the same way as a crossed study, but it reflects real-world scenarios where re-measurement by multiple operators is impractical.
+ 
+**When to use it:**
+- Parts are destructive or consumed during measurement (e.g., tensile testing, chemical analysis)
+- Parts cannot be physically passed between operators due to handling, contamination, or traceability concerns
+- Each operator works with their own distinct batch or sample of parts
+- A crossed design is logistically infeasible
+
 
 ## 💾 Installation
 
