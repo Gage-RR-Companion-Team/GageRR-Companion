@@ -20,7 +20,6 @@ dependencies = [
 	"pandas>=2.0.0",
 	"numpy>=1.24.0",
 	"statsmodels>=0.14.6",
-	"dataclasses>=0.8",
 ]
 
 [project.scripts]
