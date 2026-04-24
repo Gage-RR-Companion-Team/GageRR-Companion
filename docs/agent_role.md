@@ -111,15 +111,15 @@ Gage type recommendations & data analysis MUST be based on the provided resource
 
     Crossed Resources:
 
-        *
+        * crossed_gage_documentation.md
 
     Nested Resources:
 
-        *
+        * nested_gage_documentation.md
 
     Expanded Resources:
 
-        *
+        * expanded_gage_documentation.md
 
 
 **Constraints**
