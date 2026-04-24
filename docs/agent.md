@@ -48,12 +48,107 @@ When a template is required:
 - The template must be compatible with the corresponding uploader.
 
 ### Template Requirements by Study Type
-- Type 1:
-  - [FILL IN LATER]
-- Nested:
-  - [FILL IN LATER]
-- Crossed:
-  - [FILL IN LATER]
+
+# Type 1:
+    - **Template preview:**
+    - Total columns: 1  
+    - Headers:
+        - <Measurement Name>  
+
+    - **Column requirements:**
+    - **<Measurement Name> (required):**
+        - Must be numeric.
+        - Represents repeated measurements of the same reference part.
+        - The header should match what is being measured (e.g., Conductivity, Length, Diameter).
+
+    - **Structure rules:**
+    - Data must contain exactly one column.
+    - Each row is one repeated measurement of the same part.
+    - Minimum of 5 measurements required (25+ recommended for reliability).
+    - No additional columns are allowed.
+    - The system will interpret the first column as the measurement column regardless of its name.
+
+    - **File name:**
+    - type1-template.xlsx
+
+    - **Template behavior:**
+    - Generate an empty file with only the header row using the user’s measurement name.
+    - Do not include example data.
+    - Do not include formulas, formatting, or additional sheets.
+
+# Nested:
+    - **Template preview:**
+    - Total columns: 4  
+    - Headers:
+        - Operator  
+        - Part  
+        - Trial  
+        - Value  
+
+    - **Column requirements:**
+    - **Operator (required):**
+        - Identifies the appraiser/operator.
+    
+    - **Part (required):**
+        - Identifies the part/sample.
+    
+    - **Trial (required):**
+        - Must be an integer.
+    
+    - **Value (required):**
+        - Must be numeric.
+
+    - **Structure rules:**
+    - One row per measurement (long format).
+    - Each operator measures each part.
+    - Equal number of trials per Operator–Part combination (balanced design).
+    - Column names must match exactly.
+
+    - **File name:**
+    - crossed-template.xlsx
+
+    - **Template behavior:**
+    - Generate an empty file with only the header row.
+    - Do not include example data.
+    - Do not include formulas, formatting, or additional sheets.
+
+# Crossed:
+    - **Template preview:**
+    - Total columns: 4  
+    - Headers:
+        - Operator  
+        - Part  
+        - Trial  
+        - Value  
+
+    - **Column requirements:**
+    - **Operator (required):**
+        - Identifies the appraiser/operator.
+    
+    - **Part (required):**
+        - Identifies the part/sample.
+    
+    - **Trial (required):**
+        - Must be an integer.
+    
+    - **Value (required):**
+        - Must be numeric.
+
+    - **Structure rules:**
+    - One row per measurement (long format).
+    - Each operator measures each part.
+    - Equal number of trials per Operator–Part combination (balanced design).
+    - Column names must match exactly.
+
+    - **File name:**
+    - crossed-template.xlsx
+
+    - **Template behavior:**
+    - Generate an empty file with only the header row.
+    - Do not include example data.
+    - Do not include formulas, formatting, or additional sheets.
+
+
 - Expanded:
   - [FILL IN LATER]
 
