@@ -1,5 +1,4 @@
 import os
-import re
 
 import streamlit as st
 
@@ -10,6 +9,7 @@ from gage_rr_companion.cornelius import (
     get_model_id,
     recommend_study_type,
 )
+from gage_rr_companion.cornelius_router import route_chat_turn
 
 
 st.set_page_config(page_title="Chat with Cornelius", page_icon="C", layout="wide")
@@ -40,93 +40,6 @@ def load_hugging_face_secrets() -> None:
 
 def has_hugging_face_token() -> bool:
     return bool(os.environ.get("HUGGINGFACE_API_TOKEN") or os.environ.get("HF_TOKEN"))
-
-
-def detect_template_request(prompt: str) -> str | None:
-    """Return the requested template type when the chat should create a file."""
-    text = prompt.lower()
-    wants_file = any(
-        word in text
-        for word in ["template", "excel", "spreadsheet", "xlsx", "download", "file"]
-    )
-    if not wants_file:
-        return None
-
-    study_type = detect_study_type(prompt)
-    if study_type:
-        return study_type
-    return "known"
-
-
-def detect_study_type(prompt: str) -> str | None:
-    text = prompt.lower()
-    if re.search(r"\btype\s*1\b|\btype1\b", text):
-        return "type1"
-    if "nested" in text:
-        return "nested"
-    if "crossed" in text or "cross" in text:
-        return "crossed"
-    return None
-
-
-def detect_measurement_context(prompt: str) -> str | None:
-    """Pull a short measurement description from simple user phrasing."""
-    text = prompt.strip()
-    patterns = [
-        r"(?:measuring|measure|measurement(?:\s+is|\s+of)?|for)\s+([A-Za-z][A-Za-z0-9 /_-]{1,40})",
-        r"(?:called|named)\s+([A-Za-z][A-Za-z0-9 /_-]{1,40})",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if match:
-            value = re.split(r"[.?!,;]", match.group(1).strip())[0].strip()
-            if value.lower() not in {"crossed", "nested", "type", "template", "excel"}:
-                return value
-    return None
-
-
-def template_followup_question(study_type: str | None) -> str:
-    if study_type is None or study_type == "known":
-        return (
-            "I can make that, but I need two details first: which study type "
-            "should the template use: Type 1, Crossed, or Nested? Also, what "
-            "measurement are you recording, such as length, diameter, or torque?"
-        )
-
-    return (
-        "I can make that template. Before I export it, what measurement are you "
-        "recording, such as length, diameter, torque, or conductivity?"
-    )
-
-
-def template_chat_response(study_type: str, measurement_context: str | None = None) -> str:
-    labels = {
-        "type1": "Type 1",
-        "nested": "Nested",
-        "crossed": "Crossed",
-    }
-    headers = {
-        "type1": "<Measurement Name>",
-        "nested": "Operator, Part, Trial, Value",
-        "crossed": "Operator, Part, Trial, Value",
-    }
-    notes = {
-        "type1": "Use one row per repeated measurement of the same reference part.",
-        "nested": "Use one row per measurement; parts are nested within operator.",
-        "crossed": "Use one row per measurement; every operator measures every part for each trial.",
-    }
-    measurement_note = (
-        f"Measurement recorded: {measurement_context}.\n\n"
-        if measurement_context
-        else ""
-    )
-    return (
-        f"I created the {labels[study_type]} Excel template for you.\n\n"
-        f"{measurement_note}"
-        f"Headers: `{headers[study_type]}`\n\n"
-        f"{notes[study_type]} The template is long format, so it does not use "
-        "`Measurement 1`, `Measurement 2`, or other wide-format trial columns."
-    )
 
 
 def render_template_download(
@@ -196,12 +109,8 @@ with tab_chat:
                 "content": "Hi, I am Cornelius. Tell me your operators, parts, trials, and whether the measurement is destructive.",
             }
         ]
-    if "pending_template_request" not in st.session_state:
-        st.session_state.pending_template_request = None
-    if "selected_study_type" not in st.session_state:
-        st.session_state.selected_study_type = None
-    if "measurement_context" not in st.session_state:
-        st.session_state.measurement_context = None
+    if "cornelius_router_state" not in st.session_state:
+        st.session_state.cornelius_router_state = {}
 
     for message in st.session_state.cornelius_messages:
         with st.chat_message(message["role"]):
@@ -220,58 +129,22 @@ with tab_chat:
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            pending_template = st.session_state.pending_template_request
-            template_type = detect_template_request(prompt)
-            detected_study_type = detect_study_type(prompt)
-            measurement_context = detect_measurement_context(prompt)
+            router_state = dict(st.session_state.cornelius_router_state)
+            router_state["messages"] = st.session_state.cornelius_messages
+            result = route_chat_turn(prompt, router_state)
+            st.session_state.cornelius_router_state = result.updated_state
 
-            if detected_study_type:
-                st.session_state.selected_study_type = detected_study_type
-            if measurement_context:
-                st.session_state.measurement_context = measurement_context
-
-            if template_type == "known":
-                template_type = st.session_state.selected_study_type
-
-            if pending_template:
-                template_type = template_type or pending_template.get("study_type")
-                measurement_context = (
-                    measurement_context or pending_template.get("measurement_context")
-                )
-                if not measurement_context and len(prompt.strip()) <= 40:
-                    measurement_context = prompt.strip()
-            else:
-                measurement_context = (
-                    measurement_context or st.session_state.measurement_context
-                )
-
-            if template_type == "known":
-                response = template_followup_question(None)
-                render_chat_content("assistant", response)
-            elif template_type and not measurement_context:
-                st.session_state.pending_template_request = {
-                    "study_type": template_type,
-                    "measurement_context": None,
-                }
-                response = template_followup_question(template_type)
-                render_chat_content("assistant", response)
-            elif pending_template and measurement_context:
-                response = template_chat_response(template_type, measurement_context)
+            if result.action == "generate_template":
+                response = result.message
                 render_chat_content("assistant", response)
                 render_template_download(
-                    template_type,
-                    key=f"download-{template_type}-{len(st.session_state.cornelius_messages)}",
-                    measurement_context=measurement_context,
+                    result.template_type,
+                    key=f"download-{result.template_type}-{len(st.session_state.cornelius_messages)}",
+                    measurement_context=result.measurement_context,
                 )
-                st.session_state.pending_template_request = None
-            elif template_type:
-                response = template_chat_response(template_type, measurement_context)
+            elif result.action in {"ask_followup", "redirect"}:
+                response = result.message
                 render_chat_content("assistant", response)
-                render_template_download(
-                    template_type,
-                    key=f"download-{template_type}-{len(st.session_state.cornelius_messages)}",
-                    measurement_context=measurement_context,
-                )
             else:
                 with st.spinner("Cornelius is thinking..."):
                     response = call_agent(
@@ -281,9 +154,9 @@ with tab_chat:
                 render_chat_content("assistant", response)
 
         assistant_message = {"role": "assistant", "content": response}
-        if template_type and measurement_context:
-            assistant_message["template_type"] = template_type
-            assistant_message["measurement_context"] = measurement_context
+        if result.action == "generate_template":
+            assistant_message["template_type"] = result.template_type
+            assistant_message["measurement_context"] = result.measurement_context
         st.session_state.cornelius_messages.append(assistant_message)
 
 

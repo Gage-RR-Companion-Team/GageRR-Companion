@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import altair as alt
 from scipy import stats
 
 
@@ -112,3 +113,44 @@ def compute_type1(
 
     return results, control_chart_df
 
+
+def generate_type1_run_chart(control_chart_df: pd.DataFrame):
+    """
+    Generate a Type 1 Gage Study run chart with mean and control limit lines.
+    """
+
+    if not isinstance(control_chart_df, pd.DataFrame):
+        raise TypeError("control_chart_df must be a pandas DataFrame.")
+
+    if control_chart_df.empty:
+        raise ValueError("control_chart_df cannot be empty.")
+
+    required_cols = ["Measurement", "X_bar", "LCL", "UCL"]
+    for col in required_cols:
+        if col not in control_chart_df.columns:
+            raise ValueError(f"Required column '{col}' missing from DataFrame.")
+
+    chart_df = control_chart_df.copy().reset_index(drop=True)
+    chart_df["Run"] = range(1, len(chart_df) + 1)
+
+    run_points = (
+        alt.Chart(chart_df)
+        .mark_line(point=alt.OverlayMarkDef(filled=True, size=60), color="#1f77b4")
+        .encode(
+            x=alt.X("Run:O", title="Run", axis=alt.Axis(labelAngle=0, labelColor="black")),
+            y=alt.Y("Measurement:Q", title="Measurement", scale=alt.Scale(zero=False), axis=alt.Axis(labelColor="black")),
+            tooltip=["Run", "Measurement"]
+        )
+    )
+
+    control_lines = alt.layer(
+        alt.Chart(chart_df).mark_rule(color="grey", strokeDash=[4,4], size=2).encode(y="mean(X_bar):Q"),
+        alt.Chart(chart_df).mark_rule(color="red", size=2).encode(y="mean(UCL):Q"),
+        alt.Chart(chart_df).mark_rule(color="red", size=2).encode(y="mean(LCL):Q")
+    )
+
+    return alt.layer(run_points, control_lines).properties(
+        title="Type 1 Run Chart"
+    ).configure_view(
+        stroke="black"
+    )

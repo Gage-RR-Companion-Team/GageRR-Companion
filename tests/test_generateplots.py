@@ -4,6 +4,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from gage_rr_companion.generateplots import generateplots
+from gage_rr_companion.compute_type1 import compute_type1, generate_type1_run_chart
 import altair as alt
 
 # -----------------------------
@@ -60,6 +61,19 @@ def create_valid_results(n_operators=2, n_parts=2, n_trials=2):
 def assert_charts(charts):
     for name, chart in charts.items():
         assert isinstance(chart, (alt.Chart, alt.LayerChart)), f"{name} is not a chart"
+
+
+def create_valid_type1_control_chart_df():
+    type1_data = pd.DataFrame({"Measurement": [10.01, 9.99, 10.02, 10.00, 10.01]})
+    _, control_chart_df = compute_type1(
+        study_name="Type 1 Test",
+        user="Tester",
+        X_m=10.0,
+        units="mm",
+        tolerance=1.0,
+        data=type1_data,
+    )
+    return control_chart_df
 
 # -----------------------------
 # Test: normal valid input
@@ -157,3 +171,15 @@ def test_nan_values():
     results = create_valid_results(n_trials=3)
     charts = generateplots(df, results)
     assert_charts(charts)
+
+
+def test_type1_run_chart_valid_input():
+    control_chart_df = create_valid_type1_control_chart_df()
+    chart = generate_type1_run_chart(control_chart_df)
+    assert isinstance(chart, alt.LayerChart)
+
+
+def test_type1_run_chart_missing_required_column():
+    control_chart_df = create_valid_type1_control_chart_df().drop(columns=["UCL"])
+    with pytest.raises(ValueError):
+        generate_type1_run_chart(control_chart_df)

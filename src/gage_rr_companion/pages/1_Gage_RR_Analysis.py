@@ -3,7 +3,7 @@ import pandas as pd
 
 from gage_rr_companion.compute import ComputeGageRR
 from gage_rr_companion.compute_nested import ComputeGageRR_Nested
-from gage_rr_companion.compute_type1 import compute_type1
+from gage_rr_companion.compute_type1 import compute_type1, generate_type1_run_chart
 from gage_rr_companion.gage_rr_io import load_gage_rr_data
 from gage_rr_companion.interpret_gage_rr import interpret_gage_rr
 from gage_rr_companion.generateplots import generateplots
@@ -151,6 +151,15 @@ def display_type1_results(results, control_chart_df):
         f"{results['%Var (Repeatability + Bias)']:.2f}%",
     )
 
+    st.subheader("Plots")
+    try:
+        st.altair_chart(
+            generate_type1_run_chart(control_chart_df),
+            use_container_width=True,
+        )
+    except Exception as plot_error:
+        st.warning(f"Type 1 run chart could not be generated: {plot_error}")
+
     with st.expander("Detailed Results", expanded=False):
         st.dataframe(pd.DataFrame([results]), use_container_width=True)
 
@@ -179,14 +188,44 @@ if uploaded_file is not None:
             measurement_col = st.selectbox(
                 "Measurement column",
                 raw_df.columns,
+                help=(
+                    "The single column of repeated measurements from one operator. "
+                    "Type 1 studies should ideally use more than 25 repeated measurements."
+                ),
             )
 
-            study_name = st.text_input("Study name", value="Type 1 Gage Study")
-            user = st.text_input("Reported by", value="")
-            units = st.text_input("Units", value="")
-            x_m = st.number_input("Measurement standard value (X_m)", value=0.0)
-            tolerance = st.number_input("Total tolerance", value=1.0, min_value=0.000001)
-            k = st.number_input("K percent", value=20.0, min_value=0.000001)
+            study_name = st.text_input(
+                "Study name",
+                value="Type 1 Gage Study",
+                help="The name used to identify this Type 1 Gage Study in the results.",
+            )
+            user = st.text_input(
+                "Reported by",
+                value="",
+                help="The person conducting or reporting the one-operator Type 1 study.",
+            )
+            units = st.text_input(
+                "Units",
+                value="",
+                help="The measurement units for the repeated readings, such as mm, inches, or mS/cm.",
+            )
+            x_m = st.number_input(
+                "Measurement standard value (X_m)",
+                value=0.0,
+                help="The known reference or true value of the reliable calibration or validated standard.",
+            )
+            tolerance = st.number_input(
+                "Total tolerance",
+                value=1.0,
+                min_value=0.000001,
+                help="The total allowable tolerance for the measurement system, calculated as USL minus LSL.",
+            )
+            k = st.number_input(
+                "K percent",
+                value=20.0,
+                min_value=0.000001,
+                help="The percent of tolerance considered acceptable for measurement system variation. The default is 20%.",
+            )
 
             if st.button("Run Type 1 Gage Study"):
                 with st.spinner("Running Type 1 Gage Study..."):
