@@ -10,11 +10,25 @@ import streamlit as st
 import requests
 
 DEFAULT_MODEL_ID = "google/gemma-2-9b-it"
+DEFAULT_LOCAL_MODEL_ID = "qwen2.5-coder:3b"
 CORNELIUS_API_VERSION = "hf-chat-only-2026-04-30"
 
 
 def get_model_id() -> str:
     return os.environ.get("HF_MODEL_ID", DEFAULT_MODEL_ID)
+
+
+def get_local_model_id() -> str:
+    return os.environ.get("OLLAMA_MODEL_ID", DEFAULT_LOCAL_MODEL_ID)
+
+
+def get_agent_backend() -> str:
+    backend = os.environ.get("CORNELIUS_BACKEND", "auto").strip().lower()
+    if backend in {"hf", "huggingface", "hugging_face"}:
+        return "hf"
+    if backend in {"local", "ollama"}:
+        return "local"
+    return "auto"
 
 
 TEMPLATE_SPECS = {
@@ -292,8 +306,60 @@ def _get_hf_client() -> InferenceClient:
     )
 
 
+def _build_agent_messages(
+    user_input: str,
+    history=None,
+    doc_k: int = 2,
+    max_doc_chars: int | None = None,
+) -> list[dict[str, str]]:
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    if history:
+        messages.extend(
+            {
+                "role": message["role"],
+                "content": message["content"],
+            }
+            for message in history[-8:]
+            if isinstance(message, dict)
+            and message.get("role") in {"user", "assistant"}
+            and message.get("content")
+        )
+
+    # ---- Internal Docs ----
+    doc_context = retrieve_relevant_docs(user_input, k=doc_k)
+    if doc_context and max_doc_chars:
+        doc_context = doc_context[:max_doc_chars]
+    if doc_context:
+        user_input = f"""
+Use internal documentation as primary source:
+
+{doc_context}
+
+Question:
+{user_input}
+"""
+
+    # ---- Web fallback ----
+    web_context = ""
+    if should_search(user_input):
+        web_context = tavily_search(user_input)
+
+    if web_context:
+        user_input = f"""
+Use web results only if needed:
+
+{web_context}
+
+{user_input}
+"""
+
+    messages.append({"role": "user", "content": user_input})
+    return messages
+
+
 # -----------------------------
-# Core Agent Call
+# Core Agent Calls
 # -----------------------------
 def call_agent_via_api(user_input: str, max_tokens: int = 300, history=None) -> str:
     scope = classify_prompt_scope(user_input, history)
@@ -305,50 +371,8 @@ def call_agent_via_api(user_input: str, max_tokens: int = 300, history=None) -> 
     client = _get_hf_client()
 
     try:
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-        if history:
-            messages.extend(
-                {
-                    "role": message["role"],
-                    "content": message["content"],
-                }
-                for message in history[-8:]
-                if isinstance(message, dict)
-                and message.get("role") in {"user", "assistant"}
-                and message.get("content")
-            )
-
-        # ---- Internal Docs ----
-        doc_context = retrieve_relevant_docs(user_input)
-        if doc_context:
-            user_input = f"""
-Use internal documentation as primary source:
-
-{doc_context}
-
-Question:
-{user_input}
-"""
-
-        # ---- Web fallback ----
-        web_context = ""
-        if should_search(user_input):
-            web_context = tavily_search(user_input)
-
-        if web_context:
-            user_input = f"""
-Use web results only if needed:
-
-{web_context}
-
-{user_input}
-"""
-
-        messages.append({"role": "user", "content": user_input})
-
         response = client.chat_completion(
-            messages=messages,
+            messages=_build_agent_messages(user_input, history),
             max_tokens=max_tokens,
             temperature=0.3,
         )
@@ -359,8 +383,59 @@ Use web results only if needed:
         return f"Error: {e}"
 
 
-def call_agent(user_input: str, max_tokens: int = 300, history=None) -> str:
-    return call_agent_via_api(user_input, max_tokens, history)
+def call_agent_local(user_input: str, max_tokens: int = 300, history=None) -> str:
+    scope = classify_prompt_scope(user_input, history)
+    if scope == "out_of_scope":
+        return out_of_scope_response()
+    if scope == "ambiguous":
+        return ambiguous_scope_response()
+
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": get_local_model_id(),
+                "messages": _build_agent_messages(
+                    user_input,
+                    history,
+                    doc_k=1,
+                    max_doc_chars=5000,
+                ),
+                "stream": False,
+                "options": {
+                    "temperature": 0.3,
+                    "num_predict": max_tokens,
+                },
+            },
+            timeout=float(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "240")),
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data.get("message", {}).get("content", "").strip()
+    except Exception as e:
+        return f"Error: local model unavailable: {e}"
+
+
+def call_agent(
+    user_input: str,
+    max_tokens: int = 300,
+    history=None,
+    backend: str | None = None,
+) -> str:
+    backend = backend or get_agent_backend()
+
+    if backend == "local":
+        return call_agent_local(user_input, max_tokens, history)
+
+    response = call_agent_via_api(user_input, max_tokens, history)
+    if backend == "auto" and response.startswith("Error:"):
+        local_response = call_agent_local(user_input, max_tokens, history)
+        if not local_response.startswith("Error:"):
+            return (
+                "No huggingface API key detected, running in local mode. Response times may be slower.\n\n"
+                f"{local_response}"
+            )
+    return response
 
 
 # -----------------------------
