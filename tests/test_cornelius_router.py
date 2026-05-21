@@ -26,7 +26,7 @@ def test_crossed_context_is_captured_then_confirmation_generates_template():
 
     assert second.action == "generate_template"
     assert second.template_type == "crossed"
-    assert "Operator, Part, Trial, Value" in second.message
+    assert "Test #, Operator, Part, Trial, Value" in second.message
 
 
 def test_crossed_template_request_waits_for_non_destructive_confirmation():

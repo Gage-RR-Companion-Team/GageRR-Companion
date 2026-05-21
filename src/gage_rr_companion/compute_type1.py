@@ -30,6 +30,12 @@ def compute_type1(
     if data.shape[1] != 1:
         raise ValueError("Data must have exactly one column.")
 
+    if tolerance <= 0:
+        raise ValueError("Tolerance must be greater than zero.")
+
+    if K <= 0:
+        raise ValueError("K percent must be greater than zero.")
+
     if len(data) < 5:
         raise ValueError("At least 5 data points are required.")
 
@@ -73,8 +79,7 @@ def compute_type1(
     # -----------------------------
     pct_var_repeatability = (SV / tolerance) * 100
 
-    # Per your spec
-    pct_var_total = 20 / C_gk if C_gk != 0 else np.inf
+    pct_var_total = K / C_gk if C_gk > 0 else np.inf
 
     # -----------------------------
     # Control chart data
@@ -98,6 +103,9 @@ def compute_type1(
         "Study Name": study_name,
         "User": user,
         "Units": units,
+        "Reference Value": X_m,
+        "Tolerance": tolerance,
+        "K Percent": K,
         "n": n,
         "X_bar": X_bar,
         "S": S,
@@ -114,9 +122,13 @@ def compute_type1(
     return results, control_chart_df
 
 
-def generate_type1_run_chart(control_chart_df: pd.DataFrame):
+def generate_type1_run_chart(
+    control_chart_df: pd.DataFrame,
+    reference_value: float | None = None,
+    tolerance: float | None = None,
+):
     """
-    Generate a Type 1 Gage Study run chart with mean and control limit lines.
+    Generate a Type 1 Gage Study run chart with mean, control, and spec limit lines.
     """
 
     if not isinstance(control_chart_df, pd.DataFrame):
@@ -149,7 +161,36 @@ def generate_type1_run_chart(control_chart_df: pd.DataFrame):
         alt.Chart(chart_df).mark_rule(color="red", size=2).encode(y="mean(LCL):Q")
     )
 
-    return alt.layer(run_points, control_lines).properties(
+    layers = [run_points, control_lines]
+
+    if reference_value is not None and tolerance is not None:
+        half_tolerance = tolerance / 2
+        spec_df = pd.DataFrame(
+            {
+                "Limit": ["USL", "LSL"],
+                "Value": [
+                    reference_value + half_tolerance,
+                    reference_value - half_tolerance,
+                ],
+            }
+        )
+        spec_rules = (
+            alt.Chart(spec_df)
+            .mark_rule(color="#2ca02c", strokeDash=[8, 4], size=2)
+            .encode(y="Value:Q", tooltip=["Limit", "Value"])
+        )
+        spec_labels = (
+            alt.Chart(spec_df)
+            .mark_text(align="left", dx=6, dy=-4, color="#2ca02c", fontWeight="bold")
+            .encode(
+                x=alt.value(8),
+                y="Value:Q",
+                text="Limit:N",
+            )
+        )
+        layers.extend([spec_rules, spec_labels])
+
+    return alt.layer(*layers).properties(
         title="Type 1 Run Chart"
     ).configure_view(
         stroke="black"

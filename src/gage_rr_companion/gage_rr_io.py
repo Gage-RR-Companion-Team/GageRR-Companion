@@ -1,10 +1,98 @@
-import pandas as pd
 import os
+
+import pandas as pd
 
 
 class GageRRDataError(Exception):
     """Custom exception for Gage R&R data validation errors."""
     pass
+
+
+EXCEL_EXTENSIONS = (".xlsx", ".xlsm", ".xls")
+
+COLUMN_ALIASES = {
+    "Operator": {"operator", "appraiser", "appraiser/operator"},
+    "Part": {"part", "sample", "part (the item you are measuring)"},
+    "Trial": {"trial", "trial/replicate", "replicate", "replication"},
+    "Value": {"value", "measurement", "measured value", "readout"},
+    "Test #": {"test #", "test#", "test number", "test no", "test no."},
+}
+
+
+def _source_name(filepath) -> str:
+    return str(getattr(filepath, "name", filepath) or "")
+
+
+def _is_excel_source(filepath) -> bool:
+    return _source_name(filepath).lower().endswith(EXCEL_EXTENSIONS)
+
+
+def load_uploaded_table(filepath, is_path=True):
+    """Load a user-uploaded CSV or Excel table into a DataFrame."""
+    if is_path and not os.path.exists(filepath):
+        raise FileNotFoundError(f"The file '{filepath}' does not exist.")
+
+    try:
+        if _is_excel_source(filepath):
+            return pd.read_excel(filepath)
+        return pd.read_csv(filepath)
+    except pd.errors.EmptyDataError:
+        raise pd.errors.EmptyDataError(f"The file '{filepath}' is empty.")
+
+
+def _normalize_column_name(name: object) -> str:
+    return " ".join(str(name).strip().lower().split())
+
+
+def _canonicalize_template_columns(df: pd.DataFrame) -> pd.DataFrame:
+    rename_map = {}
+    used_names = set(df.columns.astype(str))
+
+    for column in df.columns:
+        column_text = str(column).strip()
+        normalized = _normalize_column_name(column_text)
+        for canonical, aliases in COLUMN_ALIASES.items():
+            if normalized in aliases and column_text != canonical and canonical not in used_names:
+                rename_map[column] = canonical
+                used_names.add(canonical)
+                break
+
+    if rename_map:
+        df = df.rename(columns=rename_map)
+
+    df.columns = [str(column).strip() for column in df.columns]
+    return df
+
+
+def _drop_example_rows(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+
+    cleaned = df.copy()
+    first_col = cleaned.iloc[:, 0].map(
+        lambda value: str(value).strip().lower() if pd.notna(value) else ""
+    )
+    return cleaned[~first_col.isin({"example", "example:"})].reset_index(drop=True)
+
+
+def clean_uploaded_template_table(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize generated-template conveniences before analysis."""
+    df = _canonicalize_template_columns(df)
+    return _drop_example_rows(df)
+
+
+def _drop_template_helper_rows(df: pd.DataFrame, required_cols: list[str]) -> pd.DataFrame:
+    cleaned = clean_uploaded_template_table(df)
+
+    blank_required = (
+        cleaned[required_cols]
+        .replace(r"^\s*$", pd.NA, regex=True)
+        .isna()
+        .all(axis=1)
+    )
+    cleaned = cleaned[~blank_required]
+
+    return cleaned.reset_index(drop=True)
 
 
 def load_gage_rr_data(
@@ -45,19 +133,10 @@ def load_gage_rr_data(
     """
 
     # -------------------------
-    # File existence check
+    # Load CSV or Excel
     # -------------------------
-    if is_path:
-        if not os.path.exists(filepath):
-            raise FileNotFoundError(f"The file '{filepath}' does not exist.")
-
-    # -------------------------
-    # Load CSV
-    # -------------------------
-    try:
-        df = pd.read_csv(filepath)
-    except pd.errors.EmptyDataError:
-        raise pd.errors.EmptyDataError(f"The file '{filepath}' is empty.")
+    df = load_uploaded_table(filepath, is_path=is_path)
+    df = clean_uploaded_template_table(df)
 
     # -------------------------
     # Check dataset not empty
@@ -79,6 +158,11 @@ def load_gage_rr_data(
     for col in required_cols:
         if col not in df.columns:
             raise ValueError(f"Required column '{col}' is missing from the dataset.")
+
+    df = _drop_template_helper_rows(df, required_cols)
+
+    if df.shape[0] == 0:
+        raise ValueError("Dataset contains no measurement rows.")
 
     # -------------------------
     # Check missing values

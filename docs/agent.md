@@ -93,7 +93,7 @@ When a template is required:
 - The application must generate the actual `.xlsx` file programmatically from the approved template spec.
 - Before generating a file, make sure the study type and measurement being recorded are known.
 - If either the study type or measurement context is missing, ask a targeted follow-up question instead of generating the file.
-- For Crossed and Nested templates, keep headers exactly `Operator`, `Part`, `Trial`, `Value`. Do not rename `Part` to the item being measured.
+- For Crossed and Nested templates, keep required analysis headers exactly `Operator`, `Part`, `Trial`, `Value`, with an optional pre-populated `Test #` helper column. Do not rename `Part` to the item being measured.
 - First provide a preview of the file structure.
 - Include the total number of columns.
 - List the exact column headers in order.
@@ -105,9 +105,10 @@ When a template is required:
 
 # Type 1:
     - **Template preview:**
-    - Total columns: 1  
+    - Total columns: 2
     - Headers:
-        - <Measurement Name>  
+        - Test #
+        - <Measurement Name>
 
     - **Column requirements:**
     - **<Measurement Name> (required):**
@@ -116,7 +117,7 @@ When a template is required:
         - The header should match what is being measured (e.g., Conductivity, Length, Diameter).
 
     - **Structure rules:**
-    - Data must contain exactly one column.
+    - Data must contain exactly one measurement column plus optional `Test #`.
     - Each row is one repeated measurement of the same part.
     - Minimum of 5 measurements required (25+ recommended for reliability).
     - No additional columns are allowed.
@@ -126,29 +127,30 @@ When a template is required:
     - type1-template.xlsx
 
     - **Template behavior:**
-    - Generate an empty file with only the header row using the user’s measurement name.
-    - Do not include example data.
+    - Generate a file with `Test #` pre-populated to 50 rows using the user’s measurement name.
+    - Include one example row marked `example:` that the loader ignores.
     - Do not include formulas, formatting, or additional sheets.
 
 # Nested:
     - **Template preview:**
-    - Total columns: 4  
+    - Total columns: 5
     - Headers:
-        - Operator  
-        - Part  
-        - Trial  
-        - Value  
+        - Test #
+        - Operator
+        - Part
+        - Trial
+        - Value
 
     - **Column requirements:**
     - **Operator (required):**
         - Identifies the appraiser/operator.
-    
+
     - **Part (required):**
         - Identifies the part/sample.
-    
+
     - **Trial (required):**
         - Must be an integer.
-    
+
     - **Value (required):**
         - Must be numeric.
 
@@ -163,29 +165,30 @@ When a template is required:
     - nested-template.xlsx
 
     - **Template behavior:**
-    - Generate an empty file with only the header row.
-    - Do not include example data.
+    - Generate a file with `Test #` pre-populated for the planned run count.
+    - Include one example row marked `example:` that the loader ignores.
     - Do not include formulas, formatting, or additional sheets.
 
 # Crossed:
     - **Template preview:**
-    - Total columns: 4  
+    - Total columns: 5
     - Headers:
-        - Operator  
-        - Part  
-        - Trial  
-        - Value  
+        - Test #
+        - Operator
+        - Part
+        - Trial
+        - Value
 
     - **Column requirements:**
     - **Operator (required):**
         - Identifies the appraiser/operator.
-    
+
     - **Part (required):**
         - Identifies the part/sample.
-    
+
     - **Trial (required):**
         - Must be an integer.
-    
+
     - **Value (required):**
         - Must be numeric.
 
@@ -200,8 +203,8 @@ When a template is required:
     - crossed-template.xlsx
 
     - **Template behavior:**
-    - Generate an empty file with only the header row.
-    - Do not include example data.
+    - Generate a file with `Test #` pre-populated for the planned run count.
+    - Include one example row marked `example:` that the loader ignores.
     - Do not include formulas, formatting, or additional sheets.
 
 

@@ -212,9 +212,9 @@ def template_followup_question(study_type: str | None, missing: list[str] | None
 def template_chat_response(study_type: str, measurement_context: str | None = None) -> str:
     labels = {"type1": "Type 1", "nested": "Nested", "crossed": "Crossed"}
     headers = {
-        "type1": "<Measurement Name>",
-        "nested": "Operator, Part, Trial, Value",
-        "crossed": "Operator, Part, Trial, Value",
+        "type1": "Test #, <Measurement Name>",
+        "nested": "Test #, Operator, Part, Trial, Value",
+        "crossed": "Test #, Operator, Part, Trial, Value",
     }
     notes = {
         "type1": "Use one row per repeated measurement of the same reference part.",
@@ -228,8 +228,9 @@ def template_chat_response(study_type: str, measurement_context: str | None = No
         f"I created the {labels[study_type]} Excel template for you.\n\n"
         f"{measurement_note}"
         f"Headers: `{headers[study_type]}`\n\n"
-        f"{notes[study_type]} The template is long format, so it does not use "
-        "`Measurement 1`, `Measurement 2`, or other wide-format trial columns."
+        f"{notes[study_type]} `Test #` is pre-populated for the planned run count "
+        "and is ignored by the compute functions. The template is long format, so it "
+        "does not use `Measurement 1`, `Measurement 2`, or other wide-format trial columns."
     )
 
 

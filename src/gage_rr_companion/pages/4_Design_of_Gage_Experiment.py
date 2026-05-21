@@ -1,8 +1,6 @@
-import os
-
 import streamlit as st
 
-from gage_rr_companion.cornelius import call_agent, generate_template
+from gage_rr_companion.cornelius import call_agent, generate_template, load_ai_secrets
 from gage_rr_companion.doe_workflow import (
     STUDY_LABELS,
     STUDY_PLAIN_LABELS,
@@ -79,25 +77,6 @@ FLOW_STYLES = """
 QUESTION_ONE = "Q1: Do you want to identify the repeatability of your process, or both the repeatability and reproducibility?"
 QUESTION_TWO = "Q2: Are there more than one measurable parameters you wish to assess?"
 QUESTION_THREE = "Q3: Is this testing destructive?"
-
-
-def load_hugging_face_secrets() -> None:
-    try:
-        token = st.secrets.get("HUGGINGFACE_API_TOKEN") or st.secrets.get("HF_TOKEN")
-        endpoint_url = st.secrets.get("HF_ENDPOINT_URL")
-        provider = st.secrets.get("HF_PROVIDER")
-        model_id = st.secrets.get("HF_MODEL_ID")
-    except Exception:
-        token = endpoint_url = provider = model_id = None
-
-    if token:
-        os.environ["HUGGINGFACE_API_TOKEN"] = token
-    if endpoint_url:
-        os.environ["HF_ENDPOINT_URL"] = endpoint_url
-    if provider:
-        os.environ["HF_PROVIDER"] = provider
-    if model_id:
-        os.environ["HF_MODEL_ID"] = model_id
 
 
 def set_answer(key: str, value) -> None:
@@ -209,8 +188,24 @@ def render_guided_flowchart(states: dict[str, str], answers: dict[str, str | boo
     st.markdown(svg, unsafe_allow_html=True)
 
 
-def render_template_button(study_type: str, key: str, measurement_name: str | None = None) -> None:
-    filename, excel_bytes = generate_template(study_type, measurement_name)
+def render_template_button(
+    study_type: str,
+    key: str,
+    measurement_name: str | None = None,
+    *,
+    row_count: int | None = None,
+    num_operators: int | None = None,
+    num_parts: int | None = None,
+    num_trials: int | None = None,
+) -> None:
+    filename, excel_bytes = generate_template(
+        study_type,
+        measurement_name,
+        row_count=row_count,
+        num_operators=num_operators,
+        num_parts=num_parts,
+        num_trials=num_trials,
+    )
     st.download_button(
         "Generate Template",
         data=excel_bytes,
@@ -348,15 +343,51 @@ def render_guided() -> None:
             st.success(f"Recommended: {recommendation.label}")
             st.write(recommendation.reason)
             measurement_name = None
+            template_kwargs = {}
             if recommendation.study_type == "type1":
                 measurement_name = st.text_input(
                     "What are you measuring?",
                     placeholder="Thickness, viscosity, conductivity...",
                 )
+                template_kwargs["row_count"] = st.number_input(
+                    "Template rows",
+                    min_value=25,
+                    value=50,
+                    step=1,
+                    key="guided_type1_template_rows",
+                )
+            elif recommendation.study_type in {"crossed", "nested"}:
+                cols = st.columns(3)
+                with cols[0]:
+                    template_kwargs["num_operators"] = st.number_input(
+                        "Operators/appraisers",
+                        min_value=1,
+                        value=3,
+                        key="guided_template_operators",
+                    )
+                with cols[1]:
+                    template_kwargs["num_parts"] = st.number_input(
+                        "Parts per operator" if recommendation.study_type == "nested" else "Parts",
+                        min_value=1,
+                        value=10,
+                        key="guided_template_parts",
+                    )
+                with cols[2]:
+                    template_kwargs["num_trials"] = st.number_input(
+                        "Trials per part",
+                        min_value=1,
+                        value=3,
+                        key="guided_template_trials",
+                    )
             if recommendation.study_type == "expanded":
                 st.info("For an expanded study, start by focusing on one aspect of the testing if possible. Cornelius can help narrow the first run plan.")
             else:
-                render_template_button(recommendation.study_type, "guided_template", measurement_name)
+                render_template_button(
+                    recommendation.study_type,
+                    "guided_template",
+                    measurement_name,
+                    **template_kwargs,
+                )
         else:
             st.info(recommendation.reason)
 
@@ -440,7 +471,7 @@ def render_unguided() -> None:
 
 
 
-load_hugging_face_secrets()
+load_ai_secrets()
 st.markdown(FLOW_STYLES, unsafe_allow_html=True)
 
 mode = st.session_state.get("doe_mode")

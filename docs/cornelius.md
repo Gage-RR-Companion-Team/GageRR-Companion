@@ -30,13 +30,16 @@ routing behavior without running Streamlit or spending Hugging Face API credits.
 
 Cornelius supports three model backend modes in the Streamlit sidebar:
 
-- `Auto fallback`
-  - Tries Hugging Face first.
-  - If Hugging Face returns an error, Cornelius pivots to local Ollama mode.
-
 - `Hugging Face`
-  - Uses the configured Hugging Face model and API token.
+  - Uses the preset Hugging Face model and the user's API token.
   - Best when a hosted model is available and API quota is healthy.
+
+- `OpenAI-compatible API`
+  - Uses any provider that exposes `/v1/chat/completions`.
+  - Works with OpenAI, OpenRouter, LiteLLM proxies, LM Studio, vLLM, and similar
+    hosted or local gateways.
+  - Best when users want to bring their own API key without changing
+    application code.
 
 - `Local Ollama`
   - Uses a local Ollama model through `http://localhost:11434/api/chat`.
@@ -44,12 +47,60 @@ Cornelius supports three model backend modes in the Streamlit sidebar:
     preferred.
 
 Local routing and template generation do not require either model backend.
-Only open-ended model-backed answers need Hugging Face or Ollama.
+Only open-ended model-backed answers need a configured model backend.
 
-The central `call_agent(...)` function defaults to `Auto fallback`. Future app
+The central `call_agent(...)` function defaults to `OpenAI-compatible API`. Future app
 pages, such as design-of-experiment or analysis pages, can call
-`call_agent(prompt)` directly and inherit Hugging Face-to-Ollama fallback
+`call_agent(prompt)` directly and inherit the configured backend
 without duplicating the chat page's backend handling.
+
+## Bring Your Own API
+
+The recommended generic hosted path is `OpenAI-compatible API`. Users only need
+an API base URL and an API key. Cornelius uses preset models for each backend:
+
+- OpenAI-compatible API: `gemma-4-31b`
+- Hugging Face API: `google/gemma-2-9b-it`
+- Local Ollama: `qwen2.5-coder:3b`
+
+Example:
+
+```toml
+CORNELIUS_BACKEND = "openai_compatible"
+OPENAI_COMPATIBLE_API_BASE = "https://your-provider.example/v1"
+OPENAI_COMPATIBLE_API_KEY = "your_api_key_here"
+```
+
+Common examples:
+
+```toml
+# OpenAI
+OPENAI_COMPATIBLE_API_BASE = "https://api.openai.com/v1"
+```
+
+```toml
+# OpenRouter
+OPENAI_COMPATIBLE_API_BASE = "https://openrouter.ai/api/v1"
+```
+
+```toml
+# LiteLLM proxy
+OPENAI_COMPATIBLE_API_BASE = "https://your-litellm-proxy.example/v1"
+```
+
+```toml
+# LM Studio
+OPENAI_COMPATIBLE_API_BASE = "http://localhost:1234/v1"
+OPENAI_COMPATIBLE_API_KEY = "lm-studio"
+```
+
+For OpenAI-compatible providers, the app always calls:
+
+```text
+{OPENAI_COMPATIBLE_API_BASE}/chat/completions
+```
+
+So the base URL should usually end at `/v1`, not `/v1/chat/completions`.
 
 ## Local Mode Requirements
 
@@ -93,26 +144,6 @@ qwen2.5-coder:3b
 This default was chosen because it is lighter and responded more reliably in
 local smoke testing than the larger 7B model.
 
-## Changing The Local Model
-
-Preferred method: set `OLLAMA_MODEL_ID` in `.streamlit/secrets.toml`.
-
-Example:
-
-```toml
-CORNELIUS_BACKEND = "auto"
-OLLAMA_MODEL_ID = "qwen2.5-coder:7b"
-OLLAMA_TIMEOUT_SECONDS = "240"
-```
-
-You can also set environment variables before starting Streamlit:
-
-```bash
-export CORNELIUS_BACKEND="auto"
-export OLLAMA_MODEL_ID="qwen2.5-coder:7b"
-export OLLAMA_TIMEOUT_SECONDS="300"
-```
-
 Then run the app:
 
 ```bash
@@ -125,36 +156,6 @@ Available local models can be checked with:
 ollama list
 ```
 
-If you switch to a model that is not installed, pull it first:
-
-```bash
-ollama pull <model-name>
-```
-
-Examples:
-
-```bash
-ollama pull qwen2.5-coder:3b
-ollama pull qwen2.5-coder:7b
-ollama pull qwen:7b
-```
-
-## Changing The Hugging Face Model
-
-Set `HF_MODEL_ID` in `.streamlit/secrets.toml`:
-
-```toml
-HUGGINGFACE_API_TOKEN = "your_huggingface_token_here"
-HF_MODEL_ID = "google/gemma-2-9b-it"
-```
-
-You can also use environment variables:
-
-```bash
-export HUGGINGFACE_API_TOKEN="your_huggingface_token_here"
-export HF_MODEL_ID="google/gemma-2-9b-it"
-```
-
 ## App-Wide Backend Selection
 
 Set `CORNELIUS_BACKEND` to control default behavior for any code path that
@@ -163,7 +164,7 @@ calls `call_agent(...)` without explicitly passing a backend.
 Valid values:
 
 ```toml
-CORNELIUS_BACKEND = "auto"   # default; try Hugging Face, then local Ollama on error
+CORNELIUS_BACKEND = "openai_compatible"  # default; bring-your-own OpenAI-compatible API
 CORNELIUS_BACKEND = "hf"     # Hugging Face only
 CORNELIUS_BACKEND = "local"  # Ollama only
 ```
@@ -202,14 +203,9 @@ Use this pattern:
 .streamlit/secrets.example.toml  # placeholders, committed to Git
 ```
 
-Future users should copy the example file:
-
-```bash
-cp .streamlit/secrets.example.toml .streamlit/secrets.toml
-```
-
-Then they should edit `.streamlit/secrets.toml` with their own API keys and
-local model preferences.
+Future users do not need to edit secrets files. They can choose a backend and
+enter API details directly in the Streamlit sidebar. `.streamlit/secrets.toml`
+is still supported for developers who want local defaults.
 
 Do not put real API keys in `.streamlit/secrets.example.toml`.
 
@@ -244,7 +240,6 @@ Run a local model smoke test:
 
 ```bash
 env PYTHONPATH=~/GageRR-Companion/src \
-  OLLAMA_MODEL_ID="qwen2.5-coder:3b" \
   ~/software-development/venv/bin/python \
   -c "from gage_rr_companion.cornelius import call_agent; print(call_agent('What is crossed Gage R&R? Answer in one sentence.', max_tokens=40, backend='local'))"
 ```
@@ -255,8 +250,6 @@ If local mode times out:
 
 - confirm Ollama is running
 - use `ollama list` to confirm the model is installed
-- try a smaller model such as `qwen2.5-coder:3b`
-- increase `OLLAMA_TIMEOUT_SECONDS`
 - reduce other local workloads
 
 If Hugging Face fails:
@@ -264,7 +257,7 @@ If Hugging Face fails:
 - check the API token
 - check quota/credits
 - switch the sidebar backend to `Local Ollama`
-- use `Auto fallback` to let Cornelius pivot when the API call returns an error
+- choose `Local Ollama` in the sidebar if hosted API access fails
 
 ## Known Limitations And Future Fixes
 
@@ -282,16 +275,8 @@ If Hugging Face fails:
   Future fix: add `OLLAMA_HOST` or `OLLAMA_BASE_URL` configuration so users can
   point Cornelius at a different Ollama server.
 
-- Local model quality and speed depend heavily on the user's machine and chosen
-  model. The current default is `qwen2.5-coder:3b` because it is lighter, but it
-  may be less capable than larger models.
-  Future fix: document recommended model tiers, for example small/fast,
-  balanced, and higher-quality options.
-
-- Auto fallback only triggers after a Hugging Face call returns an error. It
-  does not yet proactively detect exhausted quota before attempting the call.
-  Future fix: add clearer UI handling for quota/auth errors and a one-click
-  switch to local mode anywhere Cornelius is called.
+- Local model quality and speed depend heavily on the user's machine. The
+  current preset is `qwen2.5-coder:3b` because it is lighter and easier to run.
 
 - The Streamlit chat page exposes backend selection, but future pages may need
   their own UI hints if they call Cornelius for analysis. The core `call_agent`
