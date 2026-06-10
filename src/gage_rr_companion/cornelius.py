@@ -411,7 +411,10 @@ def retrieve_relevant_docs(query: str, k: int = 2) -> str:
 # Tavily Search
 # -----------------------------
 def tavily_search(query: str, max_results: int = 3) -> str:
-    api_key = st.secrets.get("TAVILY_API_KEY")
+    try:
+        api_key = st.secrets.get("TAVILY_API_KEY")
+    except Exception:
+        api_key = None
 
     if not api_key:
         return ""
