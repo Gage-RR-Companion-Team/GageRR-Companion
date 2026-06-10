@@ -61,7 +61,7 @@ an API base URL and an API key. Cornelius uses preset models for each backend:
 
 - OpenAI-compatible API: `gemma-4-31b`
 - Hugging Face API: `Qwen/Qwen2.5-Coder-3B-Instruct`
-- Local llama.cpp: `Qwen/Qwen2.5-7B-Instruct-GGUF`
+- Local llama.cpp: `bartowski/Qwen2.5-7B-Instruct-GGUF`
 
 Example:
 
@@ -132,8 +132,8 @@ gage_rr_companion download-local-model
 The embedded local backend uses:
 
 ```text
-Qwen/Qwen2.5-7B-Instruct-GGUF
-qwen2.5-7b-instruct-q4_k_m.gguf
+bartowski/Qwen2.5-7B-Instruct-GGUF
+Qwen2.5-7B-Instruct-Q4_K_M.gguf
 ```
 
 It does not require a model server, Hugging Face API credentials, or OpenAI-compatible
