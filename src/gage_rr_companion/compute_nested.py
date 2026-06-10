@@ -29,7 +29,7 @@ def ComputeGageRR_Nested(
     n_operators = df[operator_col].nunique()
 
     parts_per_operator = (
-        df.groupby(operator_col)[part_col]
+        df.groupby(operator_col, observed=True)[part_col]
         .nunique()
     )
 
@@ -41,7 +41,7 @@ def ComputeGageRR_Nested(
     n_parts = int(parts_per_operator.mean())
 
     trials_per_part = (
-        df.groupby([operator_col, part_col])[trial_col]
+        df.groupby([operator_col, part_col], observed=True)[trial_col]
         .nunique()
     )
 

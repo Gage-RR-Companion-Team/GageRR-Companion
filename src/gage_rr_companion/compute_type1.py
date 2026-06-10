@@ -4,6 +4,14 @@ import altair as alt
 from scipy import stats
 
 
+def _apply_black_chart_text(chart):
+    return (
+        chart.configure_axis(labelColor="black", titleColor="black")
+        .configure_legend(labelColor="black", titleColor="black")
+        .configure_title(color="black")
+    )
+
+
 def compute_type1(
     study_name: str, # Name of the Gage Study as stated by the user
     user: str, # Name of the user conducting the study
@@ -149,8 +157,8 @@ def generate_type1_run_chart(
         alt.Chart(chart_df)
         .mark_line(point=alt.OverlayMarkDef(filled=True, size=60), color="#1f77b4")
         .encode(
-            x=alt.X("Run:O", title="Run", axis=alt.Axis(labelAngle=0, labelColor="black")),
-            y=alt.Y("Measurement:Q", title="Measurement", scale=alt.Scale(zero=False), axis=alt.Axis(labelColor="black")),
+            x=alt.X("Run:O", title="Run", axis=alt.Axis(labelAngle=0, labelColor="black", titleColor="black")),
+            y=alt.Y("Measurement:Q", title="Measurement", scale=alt.Scale(zero=False), axis=alt.Axis(labelColor="black", titleColor="black")),
             tooltip=["Run", "Measurement"]
         )
     )
@@ -181,7 +189,7 @@ def generate_type1_run_chart(
         )
         spec_labels = (
             alt.Chart(spec_df)
-            .mark_text(align="left", dx=6, dy=-4, color="#2ca02c", fontWeight="bold")
+            .mark_text(align="left", dx=6, dy=-4, color="black", fontWeight="bold")
             .encode(
                 x=alt.value(8),
                 y="Value:Q",
@@ -190,8 +198,10 @@ def generate_type1_run_chart(
         )
         layers.extend([spec_rules, spec_labels])
 
-    return alt.layer(*layers).properties(
-        title="Type 1 Run Chart"
-    ).configure_view(
-        stroke="black"
+    return _apply_black_chart_text(
+        alt.layer(*layers).properties(
+            title="Type 1 Run Chart"
+        ).configure_view(
+            stroke="black"
+        )
     )

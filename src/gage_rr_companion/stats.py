@@ -95,7 +95,7 @@ def ComputeOperatorStats(
         raise ValueError("DataFrame is empty.")
 
     # Group by operator
-    grouped = df.groupby(operator_col)[value_col]
+    grouped = df.groupby(operator_col, observed=True)[value_col]
 
     stats = pd.DataFrame({
 

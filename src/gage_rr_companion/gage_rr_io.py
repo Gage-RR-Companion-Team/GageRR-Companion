@@ -10,6 +10,26 @@ class GageRRDataError(Exception):
 
 EXCEL_EXTENSIONS = (".xlsx", ".xlsm", ".xls")
 
+DEFAULT_GAGE_RR_REQUIRED_COLUMNS = ("Operator", "Part", "Trial", "Value")
+
+SUMMARY_RESULT_COLUMN_HINTS = {
+    "% gage r&r",
+    "%gage r&r",
+    "% contribution",
+    "% study var",
+    "% tolerance",
+    "% repeatability",
+    "% reproducibility",
+    "% part-to-part",
+    "gage r&r",
+    "repeatability",
+    "reproducibility",
+    "part-to-part",
+    "total gage r&r",
+    "summary metric",
+    "metric",
+}
+
 COLUMN_ALIASES = {
     "Operator": {"operator", "appraiser", "appraiser/operator"},
     "Part": {"part", "sample", "part (the item you are measuring)"},
@@ -79,6 +99,87 @@ def clean_uploaded_template_table(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize generated-template conveniences before analysis."""
     df = _canonicalize_template_columns(df)
     return _drop_example_rows(df)
+
+
+def _format_column_list(columns) -> str:
+    return ", ".join(str(column) for column in columns)
+
+
+def _looks_like_results_summary(df: pd.DataFrame) -> bool:
+    normalized_columns = {_normalize_column_name(column) for column in df.columns}
+    return bool(normalized_columns & SUMMARY_RESULT_COLUMN_HINTS)
+
+
+def validate_gage_rr_measurement_columns(
+    df: pd.DataFrame,
+    required_cols=DEFAULT_GAGE_RR_REQUIRED_COLUMNS,
+) -> None:
+    """Validate that a Crossed/Nested upload contains raw measurement columns."""
+    missing_cols = [column for column in required_cols if column not in df.columns]
+    if not missing_cols:
+        return
+
+    required_text = _format_column_list(required_cols)
+    missing_text = _format_column_list(missing_cols)
+    found_text = _format_column_list(df.columns)
+
+    if _looks_like_results_summary(df):
+        raise ValueError(
+            "This looks like a calculated Gage R&R results table, not a raw "
+            "measurement upload. For Crossed and Nested Gage R&R, upload a file "
+            f"with raw readings and these columns: {required_text}. Do not use "
+            "% Gage R&R, % Study Var, or other summary-result columns as the "
+            "input file."
+        )
+
+    raise ValueError(
+        "Crossed and Nested Gage R&R uploads must be raw measurement data with "
+        f"these columns: {required_text}. Missing column(s): {missing_text}. "
+        f"Found column(s): {found_text}."
+    )
+
+
+def _part_operator_counts(df: pd.DataFrame, part_col: str, operator_col: str) -> pd.Series:
+    return df.groupby(part_col, observed=False)[operator_col].nunique()
+
+
+def validate_gage_rr_study_design(
+    df: pd.DataFrame,
+    study_type: str,
+    operator_col="Operator",
+    part_col="Part",
+) -> None:
+    """Validate that the raw upload matches the selected Crossed or Nested design."""
+    study_type_normalized = _normalize_column_name(study_type)
+    part_operator_counts = _part_operator_counts(df, part_col, operator_col)
+    n_operators = df[operator_col].nunique()
+
+    if "crossed" in study_type_normalized:
+        observed_cells = df[[part_col, operator_col]].drop_duplicates().shape[0]
+        expected_cells = df[part_col].nunique() * n_operators
+
+        if observed_cells != expected_cells:
+            if (part_operator_counts == 1).all():
+                raise ValueError(
+                    "This upload looks like a Nested Gage R&R design, but "
+                    "Crossed Gage R&R is selected. In a crossed study, every "
+                    "operator must measure every part. Switch the study type to "
+                    "Nested Gage R&R or upload a crossed file."
+                )
+
+            raise ValueError(
+                "This upload does not match a Crossed Gage R&R design. In a "
+                "crossed study, every operator must measure every part. Missing "
+                "operator/part combinations were detected."
+            )
+
+    if "nested" in study_type_normalized and (part_operator_counts > 1).any():
+        raise ValueError(
+            "This upload looks like a Crossed Gage R&R design, but Nested Gage "
+            "R&R is selected. In a nested study, each part belongs to one "
+            "operator only. Switch the study type to Crossed Gage R&R or upload "
+            "a nested file."
+        )
 
 
 def _drop_template_helper_rows(df: pd.DataFrame, required_cols: list[str]) -> pd.DataFrame:
@@ -151,13 +252,10 @@ def load_gage_rr_data(
         raise ValueError("Dataset contains unnamed columns. All columns must have labels.")
 
     # -------------------------
-    # Check required columns exist
+    # Check required raw measurement columns exist
     # -------------------------
     required_cols = [operator_col, part_col, trial_col, value_col]
-
-    for col in required_cols:
-        if col not in df.columns:
-            raise ValueError(f"Required column '{col}' is missing from the dataset.")
+    validate_gage_rr_measurement_columns(df, required_cols)
 
     df = _drop_template_helper_rows(df, required_cols)
 

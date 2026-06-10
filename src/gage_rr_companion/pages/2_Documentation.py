@@ -1,6 +1,15 @@
 import streamlit as st
 
-st.set_page_config(page_title="Gage R&R Documentation", layout="wide")
+from gage_rr_companion.ui.sidebar import render_sidebar
+
+st.set_page_config(
+    page_title="Gage R&R Documentation",
+    page_icon="📚",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+render_sidebar("documentation")
 
 st.title("Gage R&R Documentation")
 st.write("Brief documentation and resources for Gage R&R analysis.")
@@ -27,15 +36,15 @@ st.markdown(
     - **% Gage R&R ≥ 30%**: The measurement system is not acceptable and requires improvement.  
 
     ## ▶️ Quick Start
-    To begin analysis, the program currently requires a specifically formatted CSV of the Gage R&R study results. A table consisting of the formatting can be seen below
+    To begin Crossed or Nested analysis, upload the raw measurement readings from the study, not a calculated results table. The file should match the same structure as the generated templates:
 
     | Operator | Part | Trial | Value |
     |----------|----------|----------|----------|
     |  |  |  |
 
-    All values must be filled for analysis to be successful
+    All values must be filled for analysis to be successful. Do not include summary-result columns such as **% Gage R&R**, **% Study Var**, or **% Contribution** as required upload fields; the app calculates those after upload.
 
-    When the CSV is uploaded, analysis will begin immediately and results will be shown on the same page.
+    When the CSV or Excel file is uploaded, analysis will begin immediately and results will be shown on the same page.
 
     ## 📌 Scope
 

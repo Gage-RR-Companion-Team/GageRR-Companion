@@ -1,5 +1,6 @@
 import streamlit as st
 
+from gage_rr_companion.ui.sidebar import render_sidebar
 from gage_rr_companion.cornelius import call_agent, generate_template, load_ai_secrets
 from gage_rr_companion.doe_workflow import (
     STUDY_LABELS,
@@ -10,7 +11,12 @@ from gage_rr_companion.doe_workflow import (
 )
 
 
-st.set_page_config(page_title="Design of Gage Experiment", page_icon="D", layout="wide")
+st.set_page_config(
+    page_title="Design of Gage Experiment",
+    page_icon="D",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 
 FLOW_STYLES = """
@@ -75,7 +81,7 @@ FLOW_STYLES = """
 
 
 QUESTION_ONE = "Q1: Do you want to identify the repeatability of your process, or both the repeatability and reproducibility?"
-QUESTION_TWO = "Q2: Are there more than one measurable parameters you wish to assess?"
+QUESTION_TWO = "Q2: Is there more than one measurement factor you wish to evaluate?"
 QUESTION_THREE = "Q3: Is this testing destructive?"
 
 
@@ -197,6 +203,7 @@ def render_template_button(
     num_operators: int | None = None,
     num_parts: int | None = None,
     num_trials: int | None = None,
+    parameter_names: list[str] | None = None,
 ) -> None:
     filename, excel_bytes = generate_template(
         study_type,
@@ -205,6 +212,7 @@ def render_template_button(
         num_operators=num_operators,
         num_parts=num_parts,
         num_trials=num_trials,
+        parameter_names=parameter_names,
     )
     st.download_button(
         "Generate Template",
@@ -215,6 +223,67 @@ def render_template_button(
         use_container_width=True,
     )
     st.caption(template_help(study_type))
+
+
+def expanded_parameter_names(prefix: str) -> list[str]:
+    count = int(st.session_state.get(f"{prefix}_parameter_count", 1))
+    names = []
+    for index in range(1, count + 1):
+        default_name = f"Parameter {index}"
+        names.append(st.session_state.get(f"{prefix}_parameter_{index}", default_name))
+    return names
+
+
+def render_expanded_template_controls(prefix: str) -> dict:
+    st.caption(
+        "Expanded templates include Part, Operator, Trial, Value, and editable parameter columns "
+        "for extra factors such as station, fixture, probe, method, site, or batch."
+    )
+    cols = st.columns(3)
+    with cols[0]:
+        num_operators = st.number_input(
+            "Operators/appraisers",
+            min_value=1,
+            value=3,
+            key=f"{prefix}_operators",
+        )
+    with cols[1]:
+        num_parts = st.number_input(
+            "Parts",
+            min_value=1,
+            value=10,
+            key=f"{prefix}_parts",
+        )
+    with cols[2]:
+        num_trials = st.number_input(
+            "Replicates/trials per part",
+            min_value=1,
+            value=3,
+            key=f"{prefix}_trials",
+        )
+    st.number_input(
+        "Number of parameters",
+        min_value=1,
+        max_value=8,
+        value=1,
+        step=1,
+        key=f"{prefix}_parameter_count",
+    )
+    parameter_count = int(st.session_state.get(f"{prefix}_parameter_count", 1))
+    for index in range(1, parameter_count + 1):
+        st.text_input(
+            f"Parameter {index} header",
+            value=st.session_state.get(f"{prefix}_parameter_{index}", f"Parameter {index}"),
+            key=f"{prefix}_parameter_{index}",
+        )
+    estimated_rows = int(num_operators) * int(num_parts) * int(num_trials) * parameter_count
+    st.caption(f"Template will generate {estimated_rows:,} data rows plus the example row.")
+    return {
+        "num_operators": num_operators,
+        "num_parts": num_parts,
+        "num_trials": num_trials,
+        "parameter_names": expanded_parameter_names(prefix),
+    }
 
 
 def render_cornelius_panel(context: str) -> None:
@@ -310,11 +379,11 @@ def render_guided() -> None:
             st.markdown(f"**{QUESTION_TWO}**")
             q2_one, q2_more = st.columns(2)
             with q2_one:
-                if st.button("Only one measurable parameter", use_container_width=True):
+                if st.button("Only one measurement factor", use_container_width=True):
                     set_answer("doe_multiple_parameters", False)
                     st.rerun()
             with q2_more:
-                if st.button("More than one measurable parameter", use_container_width=True):
+                if st.button("More than one measurement factor", use_container_width=True):
                     set_answer("doe_multiple_parameters", True)
                     st.rerun()
 
@@ -380,14 +449,14 @@ def render_guided() -> None:
                         key="guided_template_trials",
                     )
             if recommendation.study_type == "expanded":
-                st.info("For an expanded study, start by focusing on one aspect of the testing if possible. Cornelius can help narrow the first run plan.")
-            else:
-                render_template_button(
-                    recommendation.study_type,
-                    "guided_template",
-                    measurement_name,
-                    **template_kwargs,
-                )
+                st.info("For an expanded study, start by focusing on the most important extra measurement-system factors.")
+                template_kwargs.update(render_expanded_template_controls("guided_expanded_template"))
+            render_template_button(
+                recommendation.study_type,
+                "guided_template",
+                measurement_name,
+                **template_kwargs,
+            )
         else:
             st.info(recommendation.reason)
 
@@ -446,32 +515,30 @@ def render_unguided() -> None:
                     """,
                     unsafe_allow_html=True,
                 )
+                template_kwargs = {}
                 if study_type == "expanded":
-                    st.button(
-                        button_label,
-                        key=f"unguided_{study_type}_disabled",
-                        disabled=True,
-                        use_container_width=True,
-                    )
-                    st.caption("Ask Cornelius to narrow an expanded plan before building a custom template.")
-                else:
-                    filename, excel_bytes = generate_template(study_type)
-                    st.download_button(
-                        button_label,
-                        data=excel_bytes,
-                        file_name=filename,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key=f"unguided_{study_type}",
-                        use_container_width=True,
-                    )
+                    template_kwargs = {
+                        "parameter_names": ["Parameter 1"],
+                    }
+                filename, excel_bytes = generate_template(study_type, **template_kwargs)
+                st.download_button(
+                    button_label,
+                    data=excel_bytes,
+                    file_name=filename,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"unguided_{study_type}",
+                    use_container_width=True,
+                )
+                if study_type == "expanded":
+                    st.caption("Includes the core expanded-study columns from the notebook example. Add or rename factor columns as needed.")
 
 
     with right:
         render_cornelius_panel("unguided")
 
 
-
 load_ai_secrets()
+render_sidebar("design")
 st.markdown(FLOW_STYLES, unsafe_allow_html=True)
 
 mode = st.session_state.get("doe_mode")

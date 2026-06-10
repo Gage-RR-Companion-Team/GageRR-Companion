@@ -10,14 +10,14 @@ Cornelius has three main layers:
 
 - `src/gage_rr_companion/cornelius_router.py`
   - Local routing brain.
-  - Does not call Streamlit, Hugging Face, Tavily, or Ollama.
+  - Does not call Streamlit, hosted APIs, Tavily, or a model runtime.
   - Decides whether a chat turn should ask a follow-up, generate a template,
     redirect an unrelated prompt, or call a model.
 
 - `src/gage_rr_companion/cornelius.py`
   - Model and tool layer.
   - Holds the Cornelius system prompt, internal-doc retrieval, web-search helper,
-    Hugging Face call, local Ollama call, and template generation.
+    hosted API calls, embedded llama.cpp call, and template generation.
 
 - `src/gage_rr_companion/pages/3_Chat_with_Cornelius.py`
   - Streamlit UI layer.
@@ -41,27 +41,27 @@ Cornelius supports three model backend modes in the Streamlit sidebar:
   - Best when users want to bring their own API key without changing
     application code.
 
-- `Local Ollama`
-  - Uses a local Ollama model through `http://localhost:11434/api/chat`.
-  - Useful when Hugging Face quota is exhausted or offline/local testing is
-    preferred.
+- `Local llama.cpp`
+  - Uses the Qwen2.5-Coder 3B Instruct GGUF model through `llama-cpp-python`.
+  - Does not require a hosted API, model server, or API key after the model is cached.
+  - Best for clone-and-run local use when users install the local extra.
 
 Local routing and template generation do not require either model backend.
 Only open-ended model-backed answers need a configured model backend.
 
-The central `call_agent(...)` function defaults to `OpenAI-compatible API`. Future app
+The central `call_agent(...)` function defaults to `Local llama.cpp`. Future app
 pages, such as design-of-experiment or analysis pages, can call
 `call_agent(prompt)` directly and inherit the configured backend
 without duplicating the chat page's backend handling.
 
 ## Bring Your Own API
 
-The recommended generic hosted path is `OpenAI-compatible API`. Users only need
+The generic hosted path is `OpenAI-compatible API`. Users only need
 an API base URL and an API key. Cornelius uses preset models for each backend:
 
 - OpenAI-compatible API: `gemma-4-31b`
-- Hugging Face API: `google/gemma-2-9b-it`
-- Local Ollama: `qwen2.5-coder:3b`
+- Hugging Face API: `Qwen/Qwen2.5-Coder-3B-Instruct`
+- Local llama.cpp: `Qwen/Qwen2.5-Coder-3B-Instruct-GGUF`
 
 Example:
 
@@ -114,46 +114,47 @@ This command installs Python libraries such as Streamlit, pandas, requests,
 pip install -e .
 ```
 
-It does not install:
-
-- Ollama
-- local Ollama models
-- Hugging Face API credentials
-- Tavily API credentials
-
-Those must be installed or configured separately.
-
-Install and run Ollama, then pull a local model:
+For a no-server local Cornelius backend, install the local extra:
 
 ```bash
-ollama pull qwen2.5-coder:3b
+pip install -e ".[local]" --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
 ```
 
-Start Ollama if it is not already running:
+The extra index asks pip to use the official prebuilt CPU wheels for `llama-cpp-python`; without it, pip may try to compile native code with CMake. If pip tries to build `llama-cpp-python` from source, install with the command above or fix the local compiler environment before retrying.
+
+Then either let the Streamlit sidebar download the GGUF model on first use, or
+pre-download it explicitly:
 
 ```bash
-ollama serve
+gage_rr_companion download-local-model
 ```
 
-The current default local model is:
+The embedded local backend uses:
 
 ```text
-qwen2.5-coder:3b
+Qwen/Qwen2.5-Coder-3B-Instruct-GGUF
+qwen2.5-coder-3b-instruct-q4_k_m.gguf
 ```
 
-This default was chosen because it is lighter and responded more reliably in
-local smoke testing than the larger 7B model.
+It does not require a model server, Hugging Face API credentials, or OpenAI-compatible
+API credentials after the model file is cached.
+
+The expanded Gage R&R template follows the repository notebook example and uses:
+
+```text
+Test #, Part, Operator, Parameter 1, Trial, Value
+```
+
+Use the template generator to choose the number of parameter columns and rename
+them to measurement-system factors such as `Station`, `Fixture`, `Probe`,
+`Method`, `Site`, or `Batch` before analysis. Expanded template rows are
+calculated from operators x parts x replicates/trials x number of parameter
+columns, unless a caller explicitly overrides the row count.
 
 Then run the app:
 
 ```bash
 streamlit run src/gage_rr_companion/Home.py
-```
-
-Available local models can be checked with:
-
-```bash
-ollama list
 ```
 
 ## App-Wide Backend Selection
@@ -164,9 +165,10 @@ calls `call_agent(...)` without explicitly passing a backend.
 Valid values:
 
 ```toml
-CORNELIUS_BACKEND = "openai_compatible"  # default; bring-your-own OpenAI-compatible API
-CORNELIUS_BACKEND = "hf"     # Hugging Face only
-CORNELIUS_BACKEND = "local"  # Ollama only
+CORNELIUS_BACKEND = "llama_cpp"          # default; embedded local GGUF model, no server
+CORNELIUS_BACKEND = "openai_compatible"  # bring-your-own OpenAI-compatible API
+CORNELIUS_BACKEND = "hf"                 # Hugging Face only
+# Legacy "local" and "ollama" values also resolve to embedded llama.cpp.
 ```
 
 Future app pages should prefer:
@@ -241,42 +243,28 @@ Run a local model smoke test:
 ```bash
 env PYTHONPATH=~/GageRR-Companion/src \
   ~/software-development/venv/bin/python \
-  -c "from gage_rr_companion.cornelius import call_agent; print(call_agent('What is crossed Gage R&R? Answer in one sentence.', max_tokens=40, backend='local'))"
+  -c "from gage_rr_companion.cornelius import call_agent; print(call_agent('What is crossed Gage R&R? Answer in one sentence.', max_tokens=40, backend='llama_cpp'))"
 ```
 
 ## Troubleshooting Local Mode
 
 If local mode times out:
 
-- confirm Ollama is running
-- use `ollama list` to confirm the model is installed
+- confirm the GGUF model is cached or set `LLAMA_CPP_MODEL_PATH`
+- reduce `LLAMA_CPP_CONTEXT_SIZE` if system memory is limited
 - reduce other local workloads
 
 If Hugging Face fails:
 
 - check the API token
 - check quota/credits
-- switch the sidebar backend to `Local Ollama`
-- choose `Local Ollama` in the sidebar if hosted API access fails
+- switch the sidebar backend to `Local llama.cpp`
 
 ## Known Limitations And Future Fixes
 
-- `pip install -e .` does not install Ollama or local model weights.
-  Future fix: add a setup script or README section that checks for Ollama,
-  verifies the configured model exists, and prints the exact `ollama pull`
-  command when it is missing.
-
-- Local mode currently assumes Ollama is reachable at:
-
-  ```text
-  http://localhost:11434/api/chat
-  ```
-
-  Future fix: add `OLLAMA_HOST` or `OLLAMA_BASE_URL` configuration so users can
-  point Cornelius at a different Ollama server.
-
 - Local model quality and speed depend heavily on the user's machine. The
-  current preset is `qwen2.5-coder:3b` because it is lighter and easier to run.
+  current preset is the Qwen2.5-Coder 3B Instruct GGUF because it is small
+  enough for local use while matching the hosted model family.
 
 - The Streamlit chat page exposes backend selection, but future pages may need
   their own UI hints if they call Cornelius for analysis. The core `call_agent`

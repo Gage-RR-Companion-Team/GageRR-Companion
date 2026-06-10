@@ -27,6 +27,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+local = [
+	"llama-cpp-python>=0.3.0",
+]
 dev = [
 	"pytest>=8.0.0",
 ]

@@ -26,7 +26,7 @@ class RouterResult:
         return asdict(self)
 
 
-TEMPLATE_TYPES = {"type1", "nested", "crossed"}
+TEMPLATE_TYPES = {"type1", "nested", "crossed", "expanded"}
 
 DIRECT_SCOPE_KEYWORDS = [
     "msa", "measurement system", "gage", "gauge", "g r&r", "g r and r",
@@ -37,7 +37,7 @@ DIRECT_SCOPE_KEYWORDS = [
     "non-destructive", "nondestructive", "non destructive", "calibration",
     "inspection", "measurement", "value", "readout", "conductivity", "probe",
     "pump", "flow rate", "flowrate", "membrane", "fixture", "method",
-    "expanded", "why", "better", "sample", "electrode",
+    "expanded", "why", "better", "sample", "electrode", "factor", "factors",
 ]
 
 ADJACENT_SCOPE_KEYWORDS = [
@@ -251,6 +251,87 @@ def expanded_template_response(state: dict[str, Any]) -> str:
     )
 
 
+def factor_definition_response() -> str:
+    return (
+        "In this app, a `factor` usually means an extra study condition you want "
+        "to intentionally vary or track beyond the standard Gage R&R structure.\n\n"
+        "For normal crossed or nested Gage R&R, `Part`, `Operator/Appraiser`, and "
+        "`Trial` are the baseline structure. They are not usually what I would list "
+        "first when you ask for additional factors. Type 1 is the exception: it uses "
+        "one setup/operator and one reference part measured repeatedly.\n\n"
+        "Good factor examples are things like probe/caliper identity, fixture, "
+        "station, measurement method, location/site, shift, environment, batch, "
+        "or pump flow rate. For example, if you compare Caliper 1 vs Caliper 2, "
+        "the caliper identity is the factor being compared."
+    )
+
+
+def _is_factor_definition_question(prompt: str) -> bool:
+    text = prompt.lower().strip()
+    if "factor" not in text and "factors" not in text:
+        return False
+    definition_terms = [
+        "what is", "what are", "define", "meaning", "mean", "example",
+        "examples", "terminology", "nomenclature",
+    ]
+    return any(term in text for term in definition_terms) or len(text.split()) <= 8
+
+
+def probe_comparison_response() -> str:
+    return (
+        "For Probe A vs Probe B, use a Crossed Gage R&R to compare the gage "
+        "or instrument levels. In the template, use the `Operator` column for "
+        "the probe identity when the actual human operator is held constant.\n\n"
+        "Set up the data like this:\n"
+        "- `Operator`: Probe A or Probe B\n"
+        "- `Part`: the part/sample being measured\n"
+        "- `Trial`: the repeat number\n"
+        "- `Value`: the measured reading\n\n"
+        "Measure the same parts with both probes, and repeat each part/probe "
+        "combination for the planned number of trials. Keep the person, method, "
+        "fixture, station, and environment as constant as practical.\n\n"
+        "The probe/instrument is the factor you are comparing, but it is not "
+        "the only source of variation. The parts and repeated trials are still "
+        "needed so the study "
+        "can separate probe-to-probe difference from part-to-part variation and "
+        "normal repeatability noise."
+    )
+
+
+def _history_mentions_probe(history: list[dict[str, Any]] | None) -> bool:
+    if not history:
+        return False
+    recent = " ".join(
+        message.get("content", "")
+        for message in history[-6:]
+        if isinstance(message, dict)
+    ).lower()
+    return "probe" in recent
+
+
+def _is_probe_comparison_question(
+    prompt: str,
+    history: list[dict[str, Any]] | None = None,
+) -> bool:
+    text = prompt.lower()
+    mentions_probe = "probe" in text or _history_mentions_probe(history)
+    if not mentions_probe:
+        return False
+    probe_level_comparison = bool(
+        re.search(r"\bprobe\s+a\b", text)
+        and re.search(r"\bprobe\s+b\b", text)
+    )
+    comparison_terms = [
+        "difference", "compare", "comparison", "just probe", "only probe",
+        "probe is the only", "only factor", "one factor", "treat the probe",
+        "treat probe",
+    ]
+    crossed_terms = ["crossed", "appraiser", "operator", "replicate", "trial"]
+    return probe_level_comparison or any(term in text for term in comparison_terms) or (
+        "crossed" in text and any(term in text for term in crossed_terms)
+    )
+
+
 def _detect_measurement_design(prompt: str) -> dict[str, Any]:
     text = prompt.lower()
     design: dict[str, Any] = {}
@@ -370,6 +451,18 @@ def route_chat_turn(user_message: str, state: dict[str, Any] | None = None) -> R
         or "flow rate" in user_message.lower()
     ):
         return RouterResult("call_model", _value_column_response(current), current)
+
+    if template_type is None and _is_factor_definition_question(user_message):
+        return RouterResult("call_model", factor_definition_response(), current)
+
+    if (
+        template_type is None
+        and current.get("destructive_status") != "destructive"
+        and _is_probe_comparison_question(user_message, history)
+    ):
+        current["extra_factors"] = True
+        current["probe_comparison"] = True
+        return RouterResult("call_model", probe_comparison_response(), current)
 
     recommended_type, recommendation = _recommend_from_design(current)
     if recommended_type:

@@ -155,3 +155,61 @@ def test_make_file_after_recommendation_generates_selected_template():
 
     assert second.action == "generate_template"
     assert second.template_type == "crossed"
+
+
+def test_probe_a_vs_probe_b_recommends_crossed_without_expanded():
+    result = route_chat_turn("Probe A vs Probe B", {})
+
+    assert result.action == "call_model"
+    assert "Crossed Gage R&R" in result.message
+    assert "instrument" in result.message
+    assert "Expanded" not in result.message
+
+
+def test_probe_only_comparison_recommends_crossed_without_expanded():
+    result = route_chat_turn(
+        "I'd like to see the difference with just Probe A and Probe B",
+        {},
+    )
+
+    assert result.action == "call_model"
+    assert "Crossed Gage R&R" in result.message
+    assert "Probe A" in result.message
+    assert "Probe B" in result.message
+    assert "instrument" in result.message
+    assert "Expanded" not in result.message
+
+
+def test_probe_is_compared_factor_not_only_variation_source():
+    first = route_chat_turn(
+        "I'd like to see the difference with just Probe A and Probe B",
+        {},
+    )
+    result = route_chat_turn(
+        "But would it be correct to assume the probe is the only factor",
+        first.updated_state,
+    )
+
+    assert "not the only source of variation" in result.message
+    assert "part-to-part variation" in result.message
+    assert "repeatability" in result.message
+    assert "Expanded" not in result.message
+
+
+def test_probe_guidance_does_not_call_operator_the_main_factor():
+    result = route_chat_turn("What is the factor if I compare Probe A vs Probe B?", {})
+
+    assert "caliper identity is the factor being compared" in result.message
+    assert "baseline structure" in result.message
+    assert "main comparison factor" not in result.message
+
+
+def test_factor_definition_defaults_to_non_standard_study_conditions():
+    result = route_chat_turn("What is a factor?", {})
+
+    assert result.action == "call_model"
+    assert "baseline structure" in result.message
+    assert "probe/caliper identity" in result.message
+    assert "fixture" in result.message
+    assert "Operator: The person" not in result.message
+    assert "Part: The specific item" not in result.message

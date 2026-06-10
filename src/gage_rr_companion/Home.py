@@ -79,6 +79,11 @@ st.markdown(
         color: #166534;
     }
 
+    .coming-soon {
+        background-color: #fbe85c;
+        color: #656416;
+    }
+
     .assistant-badge {
         background-color: #dbeafe;
         color: #1d4ed8;
@@ -183,7 +188,7 @@ with c4:
     st.markdown(
         """
         <div class="card">
-            <span class="badge supported">Supported</span>
+            <span class="badge coming-soon">Coming Soon</span>
             <h3>Expanded</h3>
             <p>Includes additional sources of variation such as fixture, site, or condition.</p>
         </div>

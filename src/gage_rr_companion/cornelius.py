@@ -1,5 +1,6 @@
 import io
 import os
+from functools import lru_cache
 from typing import Optional
 
 import pandas as pd
@@ -9,20 +10,17 @@ from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 import streamlit as st
 import requests
 
-DEFAULT_MODEL_ID = "google/gemma-2-9b-it"
-DEFAULT_LOCAL_MODEL_ID = "qwen2.5-coder:3b"
+DEFAULT_MODEL_ID = "Qwen/Qwen2.5-Coder-3B-Instruct"
 DEFAULT_OPENAI_COMPATIBLE_MODEL_ID = "gemma-4-31b"
 DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_SECONDS = 180
-DEFAULT_LOCAL_TIMEOUT_SECONDS = 600
-CORNELIUS_API_VERSION = "multi-backend-chat-2026-05-20"
+DEFAULT_LLAMA_CPP_REPO_ID = "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF"
+DEFAULT_LLAMA_CPP_FILENAME = "qwen2.5-coder-3b-instruct-q4_k_m.gguf"
+DEFAULT_LLAMA_CPP_CONTEXT_SIZE = 8192
+CORNELIUS_API_VERSION = "multi-backend-chat-2026-05-24"
 
 
 def get_model_id() -> str:
     return DEFAULT_MODEL_ID
-
-
-def get_local_model_id() -> str:
-    return DEFAULT_LOCAL_MODEL_ID
 
 
 def get_openai_compatible_api_base() -> str:
@@ -64,6 +62,56 @@ def get_openai_compatible_timeout_seconds() -> float:
     return DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_SECONDS
 
 
+def get_llama_cpp_repo_id() -> str:
+    return os.environ.get("LLAMA_CPP_REPO_ID", DEFAULT_LLAMA_CPP_REPO_ID).strip()
+
+
+def get_llama_cpp_filename() -> str:
+    return os.environ.get("LLAMA_CPP_FILENAME", DEFAULT_LLAMA_CPP_FILENAME).strip()
+
+
+def get_llama_cpp_context_size() -> int:
+    raw_context_size = os.environ.get("LLAMA_CPP_CONTEXT_SIZE")
+    if raw_context_size:
+        try:
+            context_size = int(raw_context_size)
+        except ValueError:
+            return DEFAULT_LLAMA_CPP_CONTEXT_SIZE
+        if context_size > 0:
+            return context_size
+    return DEFAULT_LLAMA_CPP_CONTEXT_SIZE
+
+
+def download_llama_cpp_model() -> str:
+    try:
+        from huggingface_hub import hf_hub_download
+    except Exception as e:
+        raise RuntimeError("huggingface_hub is required to download the local GGUF model.") from e
+
+    return hf_hub_download(
+        repo_id=get_llama_cpp_repo_id(),
+        filename=get_llama_cpp_filename(),
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_llama_cpp_model():
+    try:
+        from llama_cpp import Llama
+    except Exception as e:
+        raise RuntimeError(
+            "llama-cpp-python is not installed. Install local support with "
+            '`pip install -e ".[local]" --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu`.'
+        ) from e
+
+    model_path = os.environ.get("LLAMA_CPP_MODEL_PATH") or download_llama_cpp_model()
+    return Llama(
+        model_path=model_path,
+        n_ctx=get_llama_cpp_context_size(),
+        verbose=False,
+    )
+
+
 def load_ai_secrets() -> None:
     """Copy supported Streamlit secrets into environment variables."""
     try:
@@ -79,6 +127,9 @@ def load_ai_secrets() -> None:
             or st.secrets.get("CORNELIUS_API_KEY"),
             "OPENAI_COMPATIBLE_MODEL_ID": st.secrets.get("OPENAI_COMPATIBLE_MODEL_ID")
             or st.secrets.get("CORNELIUS_MODEL_ID"),
+            "LLAMA_CPP_MODEL_PATH": st.secrets.get("LLAMA_CPP_MODEL_PATH"),
+            "LLAMA_CPP_REPO_ID": st.secrets.get("LLAMA_CPP_REPO_ID"),
+            "LLAMA_CPP_FILENAME": st.secrets.get("LLAMA_CPP_FILENAME"),
         }
     except Exception:
         values = {}
@@ -89,11 +140,11 @@ def load_ai_secrets() -> None:
 
 
 def get_agent_backend() -> str:
-    backend = os.environ.get("CORNELIUS_BACKEND", "openai_compatible").strip().lower()
+    backend = os.environ.get("CORNELIUS_BACKEND", "llama_cpp").strip().lower()
     if backend in {"hf", "huggingface", "hugging_face"}:
         return "hf"
-    if backend in {"local", "ollama"}:
-        return "local"
+    if backend in {"llama_cpp", "llamacpp", "embedded", "local_embedded", "local", "ollama"}:
+        return "llama_cpp"
     if backend in {
         "api",
         "remote",
@@ -106,7 +157,7 @@ def get_agent_backend() -> str:
         return "openai_compatible"
     if backend == "auto":
         return "auto"
-    return "openai_compatible"
+    return "llama_cpp"
 
 
 TEMPLATE_SPECS = {
@@ -124,6 +175,11 @@ TEMPLATE_SPECS = {
         "filename": "crossed-template.xlsx",
         "headers": ["Test #", "Operator", "Part", "Trial", "Value"],
         "default_rows": 50,
+    },
+    "expanded": {
+        "filename": "expanded-template.xlsx",
+        "headers": ["Test #", "Part", "Operator", "Parameter 1", "Trial", "Value"],
+        "default_rows": 180,
     },
 }
 
@@ -152,17 +208,45 @@ Study selection guidance:
 - Crossed: non-destructive measurement where each operator can measure each part.
 - Nested: destructive measurement, or parts cannot be shared across operators.
 - Expanded: consider when the user suspects additional factors beyond operator and part,
-  such as probes, fixtures, pump flow rates, methods, sites, shifts, or environmental
+  such as probes, fixtures, pump, methods, sites, shifts, or environmental
   conditions. Mention that expanded studies are generally not the first recommendation
   because they increase scope, data requirements, and analysis complexity. If Expanded
   seems relevant, recommend it as an escalation/next step, and offer a simpler nested or
   crossed starting point when appropriate.
 - If the user asks "why nested over expanded" or compares study types, answer the
   comparison directly instead of repeating the original recommendation.
+- If the user wants to compare Probe A vs Probe B and does not explicitly ask to
+  study other factors, recommend a simple Crossed Gage R&R. Explain that the
+  gage/instrument is the system being evaluated, and the appraiser/operator
+  column can be used to represent the probe levels: Probe A and Probe B.
+  Do not recommend Expanded in this case; assume the user may treat your first
+  recommendation as authoritative.
+- For probe-only comparisons, explain the data structure plainly: use multiple
+  parts, measure each part with both probes, and repeat the measurements across
+  trials. Hold the human operator, method, fixture, station, and environment as
+  constant as practical.
+- Make the key distinction clear: the probe is the factor being compared, not the
+  only source of variation. Parts and repeatability/trial noise are still part of
+  the study and are required to tell whether the probe difference is meaningful.
+- Use "factor" consistently for a study input or condition that is intentionally
+  varied or tracked beyond the baseline Gage R&R structure. Do not default to
+  operator, part, or trial as examples when the user asks what a factor is:
+  operators/appraisers, parts, and trials are standard Gage R&R structure
+  (except Type 1, which has one operator/setup and one reference part).
+- Default examples of factors should be other study conditions such as instrument
+  identity (Probe A vs Probe B, caliper 1 vs caliper 2), fixture, station,
+  measurement method, location/site, shift, environment, batch, or pump.
+  When comparing instruments such as Probe A vs Probe B, instrument identity is
+  the comparison factor and can be represented by the appraiser/operator column
+  if the actual human operator is held constant. In an expanded design, added
+  columns are additional factors.
+- Only discuss Expanded if the user explicitly asks to study probe plus another
+  active factor, such as real operators, fixtures, methods, stations, or flow rates.
 - Nested is better when the immediate design constraint is destructive testing and the
   main question is operator/part measurement variation.
-- Expanded is better when the study goal is to quantify additional suspected sources of
-  variation, such as probe-to-probe differences or pump-flow-rate effects.
+- Expanded is better when the study goal is to quantify multiple active factors
+  at the same time, such as probe plus real operator, fixture, method, site,
+  shift, or pump effects.
 - If both are true, say that Nested is the simpler starting design, while Expanded is the
   more complete design if the user can afford the added factors, runs, and analysis
   complexity.
@@ -170,7 +254,7 @@ Study selection guidance:
 Column guidance:
 - In the app's standard templates, `Value` is the measured response/readout, not the
   experimental setting. For conductivity testing, `Value` should usually be the
-  conductivity readout. Pump flow rate, probe ID, fixture, method, or site are study
+  conductivity readout. Pump, probe ID, fixture, method, or site are study
   factors/settings. They belong in an expanded design or in controlled/held-constant
   study notes, not in the `Value` column.
 - Standard app-compatible crossed and nested template headers are:
@@ -193,7 +277,7 @@ DIRECT_SCOPE_KEYWORDS = [
     "appraiser", "part", "trial", "variance component", "anova",
     "template", "xlsx", "excel", "csv", "upload", "destructive",
     "non-destructive", "calibration", "inspection", "measurement",
-    "value", "readout", "conductivity", "probe", "pump", "flow rate",
+    "value", "readout", "conductivity", "probe", "pump",
     "membrane", "fixture", "method", "expanded",
     "why", "better",
 ]
@@ -473,7 +557,12 @@ def call_agent_via_api(user_input: str, max_tokens: int | None = 300, history=No
         return f"Error: {e}"
 
 
-def call_agent_local(user_input: str, max_tokens: int | None = 300, history=None, include_context: bool = True) -> str:
+def call_agent_llama_cpp(
+    user_input: str,
+    max_tokens: int | None = 300,
+    history=None,
+    include_context: bool = True,
+) -> str:
     scope = classify_prompt_scope(user_input, history)
     if scope == "out_of_scope":
         return out_of_scope_response()
@@ -481,8 +570,7 @@ def call_agent_local(user_input: str, max_tokens: int | None = 300, history=None
         return ambiguous_scope_response()
 
     try:
-        request_json = {
-            "model": get_local_model_id(),
+        request_kwargs = {
             "messages": _build_agent_messages(
                 user_input,
                 history,
@@ -490,28 +578,19 @@ def call_agent_local(user_input: str, max_tokens: int | None = 300, history=None
                 max_doc_chars=5000,
                 include_context=include_context,
             ),
-            "stream": False,
-            "options": {
-                "temperature": 0.3,
-            },
+            "temperature": 0.3,
         }
         if max_tokens is not None:
-            request_json["options"]["num_predict"] = max_tokens
-        response = requests.post(
-            "http://localhost:11434/api/chat",
-            json=request_json,
-            timeout=DEFAULT_LOCAL_TIMEOUT_SECONDS,
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data.get("message", {}).get("content", "").strip()
+            request_kwargs["max_tokens"] = max_tokens
+        response = _get_llama_cpp_model().create_chat_completion(**request_kwargs)
+        return response["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        return f"Error: local model unavailable: {e}"
+        return f"Error: embedded llama.cpp model unavailable: {e}"
 
 
 def call_agent_openai_compatible(
     user_input: str,
-    max_tokens: int | None = 300,
+    max_tokens: int | None = 600,
     history=None,
     include_context: bool = True,
 ) -> str:
@@ -569,7 +648,7 @@ def call_agent_openai_compatible(
         return f"Error: OpenAI-compatible API unavailable: {e}"
 
 
-def call_agent_cornelius_api(user_input: str, max_tokens: int | None = 300, history=None, include_context: bool = True) -> str:
+def call_agent_cornelius_api(user_input: str, max_tokens: int | None = 600, history=None, include_context: bool = True) -> str:
     if include_context:
         return call_agent_openai_compatible(user_input, max_tokens, history)
     return call_agent_openai_compatible(
@@ -582,17 +661,19 @@ def call_agent_cornelius_api(user_input: str, max_tokens: int | None = 300, hist
 
 def call_agent(
     user_input: str,
-    max_tokens: int | None = 300,
+    max_tokens: int | None = 600,
     history=None,
     backend: str | None = None,
     include_context: bool = True,
 ) -> str:
     backend = backend or get_agent_backend()
+    if backend in {"local", "ollama"}:
+        backend = "llama_cpp"
 
-    if backend == "local":
+    if backend == "llama_cpp":
         if include_context:
-            return call_agent_local(user_input, max_tokens, history)
-        return call_agent_local(user_input, max_tokens, history, include_context=False)
+            return call_agent_llama_cpp(user_input, max_tokens, history)
+        return call_agent_llama_cpp(user_input, max_tokens, history, include_context=False)
     if backend == "openai_compatible":
         if include_context:
             return call_agent_openai_compatible(user_input, max_tokens, history)
@@ -614,9 +695,9 @@ def call_agent(
         )
     if backend == "auto" and response.startswith("Error:"):
         if include_context:
-            local_response = call_agent_local(user_input, max_tokens, history)
+            local_response = call_agent_llama_cpp(user_input, max_tokens, history)
         else:
-            local_response = call_agent_local(
+            local_response = call_agent_llama_cpp(
                 user_input,
                 max_tokens,
                 history,
@@ -624,7 +705,7 @@ def call_agent(
             )
         if not local_response.startswith("Error:"):
             return (
-                "No huggingface API key detected, running in local mode. Response times may be slower.\n\n"
+                "The Hugging Face call failed, running in embedded local mode. Response times may be slower.\n\n"
                 f"{local_response}"
             )
     return response
@@ -677,6 +758,7 @@ def template_row_count(
     num_operators: int | None = None,
     num_parts: int | None = None,
     num_trials: int | None = None,
+    num_parameters: int | None = None,
     row_count: int | None = None,
 ) -> int:
     key = study_type.lower()
@@ -689,14 +771,36 @@ def template_row_count(
     trials = _positive_int(num_trials)
     if key in {"crossed", "nested"} and operators and parts and trials:
         return operators * parts * trials
+    parameters = _positive_int(num_parameters)
+    if key == "expanded" and operators and parts and trials and parameters:
+        return operators * parts * trials * parameters
 
     return TEMPLATE_SPECS[key]["default_rows"]
 
 
-def _template_rows(key: str, row_count: int):
+def _expanded_parameter_names(parameter_names: list[str] | None = None) -> list[str]:
+    if not parameter_names:
+        return ["Parameter 1"]
+
+    names = []
+    for index, name in enumerate(parameter_names, start=1):
+        clean_name = str(name or "").strip()
+        names.append(clean_name or f"Parameter {index}")
+    return names
+
+
+def _template_rows(key: str, row_count: int, parameter_names: list[str] | None = None):
     if key == "type1":
         rows = [["example:", 10]]
         rows.extend([[index, None] for index in range(1, row_count + 1)])
+        return rows
+
+    if key == "expanded":
+        example_parameters = _expanded_parameter_names(parameter_names)
+        rows = [["example:", "Part 1", "Operator A", *example_parameters, 1, 10]]
+        rows.extend(
+            [[index, None, None, *([None] * len(example_parameters)), None, None] for index in range(1, row_count + 1)]
+        )
         return rows
 
     rows = [["example:", "Operator A", "Part 1", 1, 10]]
@@ -712,6 +816,8 @@ def generate_template(
     num_parts: int | None = None,
     num_trials: int | None = None,
     row_count: int | None = None,
+    parameter_names: list[str] | None = None,
+    num_parameters: int | None = None,
 ):
 
     key = study_type.lower()
@@ -720,17 +826,25 @@ def generate_template(
     headers = list(spec["headers"])
     if key == "type1" and measurement_name:
         headers = ["Test #", measurement_name]
+    if key == "expanded":
+        expanded_parameters = _expanded_parameter_names(parameter_names)
+        headers = ["Test #", "Part", "Operator", *expanded_parameters, "Trial", "Value"]
+        num_parameters = len(expanded_parameters)
 
     output_rows = template_row_count(
         key,
         num_operators=num_operators,
         num_parts=num_parts,
         num_trials=num_trials,
+        num_parameters=num_parameters,
         row_count=row_count,
     )
 
     output = io.BytesIO()
-    pd.DataFrame(_template_rows(key, output_rows), columns=headers).to_excel(
+    pd.DataFrame(
+        _template_rows(key, output_rows, parameter_names=parameter_names),
+        columns=headers,
+    ).to_excel(
         output,
         index=False,
     )

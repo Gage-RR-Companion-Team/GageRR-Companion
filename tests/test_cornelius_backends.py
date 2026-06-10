@@ -1,14 +1,14 @@
 from gage_rr_companion import cornelius
 
 
-def test_call_agent_uses_local_backend(monkeypatch):
+def test_legacy_local_backend_routes_to_llama_cpp(monkeypatch):
     calls = []
 
-    def fake_local(user_input, max_tokens=300, history=None):
+    def fake_llama_cpp(user_input, max_tokens=300, history=None):
         calls.append((user_input, max_tokens, history))
         return "local answer"
 
-    monkeypatch.setattr(cornelius, "call_agent_local", fake_local)
+    monkeypatch.setattr(cornelius, "call_agent_llama_cpp", fake_llama_cpp)
 
     response = cornelius.call_agent("why is ndc low?", backend="local")
 
@@ -31,18 +31,91 @@ def test_call_agent_uses_openai_compatible_backend(monkeypatch):
     assert calls[0][0] == "why is ndc low?"
 
 
+
+def test_configured_llama_cpp_aliases(monkeypatch):
+    monkeypatch.setenv("CORNELIUS_BACKEND", "embedded")
+
+    assert cornelius.get_agent_backend() == "llama_cpp"
+
+
+def test_call_agent_uses_llama_cpp_backend(monkeypatch):
+    calls = []
+
+    def fake_llama_cpp(user_input, max_tokens=300, history=None):
+        calls.append((user_input, max_tokens, history))
+        return "embedded answer"
+
+    monkeypatch.setattr(cornelius, "call_agent_llama_cpp", fake_llama_cpp)
+
+    response = cornelius.call_agent("why is ndc low?", backend="llama_cpp")
+
+    assert response == "embedded answer"
+    assert calls[0][0] == "why is ndc low?"
+
+
+def test_llama_cpp_backend_uses_chat_completion(monkeypatch):
+    request = {}
+
+    class FakeLlama:
+        def create_chat_completion(self, **kwargs):
+            request.update(kwargs)
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "embedded answer",
+                        },
+                    }
+                ]
+            }
+
+    monkeypatch.setattr(cornelius, "_get_llama_cpp_model", lambda: FakeLlama())
+
+    response = cornelius.call_agent_llama_cpp("why is ndc low?", max_tokens=40)
+
+    assert response == "embedded answer"
+    assert request["max_tokens"] == 40
+    assert request["messages"][0]["role"] == "system"
+
+
+def test_llama_cpp_backend_can_omit_max_tokens(monkeypatch):
+    request = {}
+
+    class FakeLlama:
+        def create_chat_completion(self, **kwargs):
+            request.update(kwargs)
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "embedded answer",
+                        },
+                    }
+                ]
+            }
+
+    monkeypatch.setattr(cornelius, "_get_llama_cpp_model", lambda: FakeLlama())
+
+    response = cornelius.call_agent_llama_cpp("interpret this Gage R&R result", max_tokens=None)
+
+    assert response == "embedded answer"
+    assert "max_tokens" not in request
+
 def test_configured_openai_compatible_aliases(monkeypatch):
     monkeypatch.setenv("CORNELIUS_BACKEND", "api")
 
     assert cornelius.get_agent_backend() == "openai_compatible"
 
 
-def test_hf_and_local_model_presets_ignore_environment_overrides(monkeypatch):
+def test_model_presets_use_backend_specific_defaults(monkeypatch):
     monkeypatch.setenv("HF_MODEL_ID", "qwen/qwen3")
-    monkeypatch.setenv("OLLAMA_MODEL_ID", "llama3.1")
+    monkeypatch.delenv("OPENAI_COMPATIBLE_MODEL_ID", raising=False)
+    monkeypatch.delenv("CORNELIUS_MODEL_ID", raising=False)
+    monkeypatch.delenv("LLAMA_CPP_REPO_ID", raising=False)
 
-    assert cornelius.get_model_id() == "google/gemma-2-9b-it"
-    assert cornelius.get_local_model_id() == "qwen2.5-coder:3b"
+    assert cornelius.get_model_id() == "Qwen/Qwen2.5-Coder-3B-Instruct"
+    assert cornelius.get_openai_compatible_model_id() == "gemma-4-31b"
+    assert cornelius.get_llama_cpp_repo_id() == "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF"
 
 
 def test_openai_compatible_model_can_be_configured(monkeypatch):
@@ -61,10 +134,6 @@ def test_openai_compatible_timeout_ignores_invalid_override(monkeypatch):
     monkeypatch.setenv("OPENAI_COMPATIBLE_TIMEOUT_SECONDS", "not-a-number")
 
     assert cornelius.get_openai_compatible_timeout_seconds() == cornelius.DEFAULT_OPENAI_COMPATIBLE_TIMEOUT_SECONDS
-
-
-def test_local_timeout_preset_allows_slow_local_model():
-    assert cornelius.DEFAULT_LOCAL_TIMEOUT_SECONDS == 600
 
 
 def test_openai_compatible_backend_posts_to_chat_completions(monkeypatch):
@@ -145,7 +214,7 @@ def test_call_agent_auto_falls_back_to_local_on_hf_error(monkeypatch):
     )
     monkeypatch.setattr(
         cornelius,
-        "call_agent_local",
+        "call_agent_llama_cpp",
         lambda user_input, max_tokens=300, history=None: "local answer",
     )
 
@@ -163,7 +232,7 @@ def test_call_agent_auto_returns_hf_answer_when_available(monkeypatch):
     )
     monkeypatch.setattr(
         cornelius,
-        "call_agent_local",
+        "call_agent_llama_cpp",
         lambda user_input, max_tokens=300, history=None: "local answer",
     )
 
@@ -174,21 +243,21 @@ def test_call_agent_defaults_to_configured_backend(monkeypatch):
     monkeypatch.setenv("CORNELIUS_BACKEND", "local")
     monkeypatch.setattr(
         cornelius,
-        "call_agent_local",
+        "call_agent_llama_cpp",
         lambda user_input, max_tokens=300, history=None: "local answer",
     )
 
     assert cornelius.call_agent("interpret my gage result") == "local answer"
 
 
-def test_call_agent_defaults_to_openai_compatible_backend(monkeypatch):
+def test_call_agent_defaults_to_embedded_local_backend(monkeypatch):
     monkeypatch.delenv("CORNELIUS_BACKEND", raising=False)
     monkeypatch.setattr(
         cornelius,
-        "call_agent_openai_compatible",
-        lambda user_input, max_tokens=300, history=None: "remote answer",
+        "call_agent_llama_cpp",
+        lambda user_input, max_tokens=300, history=None: "local answer",
     )
 
     response = cornelius.call_agent("interpret my gage result")
 
-    assert response == "remote answer"
+    assert response == "local answer"

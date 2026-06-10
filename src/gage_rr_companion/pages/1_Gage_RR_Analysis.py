@@ -20,6 +20,8 @@ from gage_rr_companion.gage_rr_io import (
     clean_uploaded_template_table,
     load_gage_rr_data,
     load_uploaded_table,
+    validate_gage_rr_measurement_columns,
+    validate_gage_rr_study_design,
 )
 from gage_rr_companion.generateplots import generateplots
 from gage_rr_companion.interpret_gage_rr import interpret_gage_rr
@@ -40,38 +42,36 @@ def inject_css():
     st.markdown(
         """
         <style>
-        [data-testid="stSidebar"] {
-            background-color: #ffffff;
-            border-right: 1px solid #e5e7eb;
-        }
-
         .block-container {
             padding-top: 2rem;
             padding-bottom: 3rem;
             max-width: 1400px;
         }
 
-        h1, h2, h3, h4 {
+        [data-testid="stMain"] h1,
+        [data-testid="stMain"] h2,
+        [data-testid="stMain"] h3,
+        [data-testid="stMain"] h4 {
             letter-spacing: -0.02em;
         }
 
-        h1 {
+        [data-testid="stMain"] h1 {
             font-weight: 800;
         }
 
-        h2 {
+        [data-testid="stMain"] h2 {
             font-weight: 750;
         }
 
-        h3 {
+        [data-testid="stMain"] h3 {
             font-weight: 700;
         }
 
-        p {
+        [data-testid="stMain"] p {
             line-height: 1.65;
         }
 
-        [data-testid="stMarkdownContainer"] p {
+        [data-testid="stMain"] [data-testid="stMarkdownContainer"] p {
             font-size: 0.98rem;
         }
 
@@ -163,6 +163,9 @@ def inject_css():
         """,
         unsafe_allow_html=True,
     )
+
+
+inject_css()
 
 
 def section_title(text: str):
@@ -317,10 +320,11 @@ def get_cornelius_followup(
     return st.session_state.cornelius_followups[cache_key]
 
 
-def render_cornelius_followup(markdown_text: str) -> None:
-    st.markdown("**Cornelius follow-up actions**")
-    with st.container(height=240, border=True):
+def render_cornelius_followup(markdown_text: str | None = None) -> None:
+    if markdown_text:
         st.markdown(markdown_text)
+    else:
+        st.caption("Cornelius will populate this box after the analysis output is rendered.")
 
 
 def type1_total_tolerance(
@@ -554,26 +558,19 @@ def display_standard_gage_results(
     summary_left, summary_right = st.columns([1.1, 1])
 
     with summary_left:
-        with st.container(border=True):
+        with st.container(height=240, border=True):
             st.subheader("Primary Result")
             st.write(interpretation.get("gage_rr_status", "N/A"))
             st.markdown("**Root cause:**")
             st.write(interpretation.get("root_cause", "N/A"))
 
     with summary_right:
-        with st.container(border=True):
-            st.subheader("Recommended Review")
+        cornelius_placeholder = st.empty()
+        with cornelius_placeholder.container(height=240, border=True):
+            st.subheader("Cornelius Review")
             st.markdown("**Discrimination:**")
             st.write(interpretation.get("discrimination", "N/A"))
-
-            with st.spinner("Cornelius is reviewing the results..."):
-                followup = get_cornelius_followup(
-                    study_type_name,
-                    results,
-                    interpretation,
-                    measurement_context,
-                )
-            render_cornelius_followup(followup)
+            render_cornelius_followup()
 
     section_title("Key Metrics")
 
@@ -740,6 +737,19 @@ def display_standard_gage_results(
 
     export_section(df, results, interpretation, study_type_name)
 
+    with cornelius_placeholder.container(height=240, border=True):
+        st.subheader("Cornelius Review")
+        st.markdown("**Discrimination:**")
+        st.write(interpretation.get("discrimination", "N/A"))
+        with st.spinner("Cornelius is reviewing the results..."):
+            followup = get_cornelius_followup(
+                study_type_name,
+                results,
+                interpretation,
+                measurement_context,
+            )
+        render_cornelius_followup(followup)
+
 
 def display_type1_results(results, control_chart_df, measurement_name: str):
     interpretation = interpret_type1_results(results)
@@ -763,7 +773,7 @@ def display_type1_results(results, control_chart_df, measurement_name: str):
     summary_left, summary_right = st.columns([1.1, 1])
 
     with summary_left:
-        with st.container(border=True):
+        with st.container(height=240, border=True):
             st.subheader("Primary Result")
             st.write(interpretation.get("gage_rr_status", "N/A"))
             st.markdown("**Bias check:**")
@@ -772,18 +782,10 @@ def display_type1_results(results, control_chart_df, measurement_name: str):
             st.write(interpretation.get("root_cause", "N/A"))
 
     with summary_right:
-        with st.container(border=True):
-            with st.spinner("Cornelius is reviewing the results..."):
-                followup = get_cornelius_followup(
-                    "Type 1 Gage Study",
-                    type1_payload,
-                    interpretation,
-                    {
-                        "measurement_name": measurement_name,
-                        "units": results["Units"],
-                    },
-                )
-            render_cornelius_followup(followup)
+        cornelius_placeholder = st.empty()
+        with cornelius_placeholder.container(height=240, border=True):
+            st.subheader("Cornelius Review")
+            render_cornelius_followup()
 
     section_title("Key Metrics")
 
@@ -842,8 +844,20 @@ def display_type1_results(results, control_chart_df, measurement_name: str):
         "Type 1 Gage Study",
     )
 
+    with cornelius_placeholder.container(height=240, border=True):
+        st.subheader("Cornelius Review")
+        with st.spinner("Cornelius is reviewing the results..."):
+            followup = get_cornelius_followup(
+                "Type 1 Gage Study",
+                type1_payload,
+                interpretation,
+                {
+                    "measurement_name": measurement_name,
+                    "units": results["Units"],
+                },
+            )
+        render_cornelius_followup(followup)
 
-inject_css()
 
 st.markdown(
     """
@@ -859,8 +873,13 @@ setup_left, setup_right = st.columns([1.2, 1])
 
 with setup_left:
     uploaded_file = st.file_uploader(
-        "Upload your data file",
+        "Upload your raw measurement data file",
         type=["csv", "xlsx", "xlsm", "xls"],
+        help=(
+            "Crossed and Nested uploads should look like the templates: "
+            "Operator, Part, Trial, Value. Upload raw readings, not a results "
+            "summary table with % Gage R&R."
+        ),
     )
 
 with setup_right:
@@ -900,8 +919,10 @@ try:
     uploaded_file.seek(0)
 
     if study_type in ["Crossed Gage R&R", "Nested Gage R&R"]:
+        validate_gage_rr_measurement_columns(raw_df)
         with st.spinner(f"Running {study_type} analysis..."):
             df = load_gage_rr_data(uploaded_file, is_path=False)
+            validate_gage_rr_study_design(df, study_type)
             measurement_context = {
                 "measurement_name": "Value",
                 "units": "",

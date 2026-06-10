@@ -46,7 +46,9 @@ def create_valid_results(n_operators=2, n_parts=2, n_trials=2):
     variance_components = pd.DataFrame({
         "Source": ["Repeatability", "Reproducibility", "Part-To-Part", "Total Gage R&R", "Total Variation"],
         "VarianceComponent": [0.5, 0.3, 1.2, 0.8, 2.0],
-        "PercentContribution": [25, 15, 60, 40, 100]
+        "PercentContribution": [25, 15, 60, 40, 100],
+        "StudyVar": [4.2426, 3.2863, 6.5727, 5.3666, 8.4853],
+        "PercentStudyVar": [50, 38.73, 77.46, 63.25, 100],
     })
 
     n_measurements = n_operators * n_parts * n_trials
@@ -173,6 +175,84 @@ def test_nan_values():
     assert_charts(charts)
 
 
+
+
+
+
+def _layer_rule_values(chart):
+    spec = chart.to_dict()
+    values = []
+
+    def collect_rules(layer):
+        nested_layers = layer.get("layer")
+        if nested_layers:
+            for nested_layer in nested_layers:
+                collect_rules(nested_layer)
+            return
+
+        mark = layer.get("mark", {})
+        mark_type = mark.get("type") if isinstance(mark, dict) else mark
+        if mark_type == "rule":
+            data_name = layer["data"]["name"]
+            values.extend(row["y"] for row in spec["datasets"][data_name])
+
+    for layer in spec["layer"]:
+        collect_rules(layer)
+
+    return values
+
+
+def test_xbar_limits_use_subgroup_mean_standard_error():
+    df = create_valid_df(n_operators=2, n_parts=2, n_trials=3)
+    results = create_valid_results(n_operators=2, n_parts=2, n_trials=3)
+
+    charts = generateplots(df, results)
+    rule_values = sorted(_layer_rule_values(charts["xbar_control_chart"]))
+
+    grouped = df.groupby(["Operator", "Part"], observed=True)["Value"]
+    xbarbar = grouped.mean().mean()
+    rbar = grouped.agg(lambda x: x.max() - x.min()).mean()
+    d2 = 1.693
+    expected_width = 3 * (rbar / d2) / np.sqrt(3)
+
+    assert rule_values == pytest.approx(
+        sorted([xbarbar, xbarbar + expected_width, xbarbar - expected_width])
+    )
+
+
+def test_generateplots_handles_nested_categorical_part_labels():
+    df = pd.DataFrame(
+        [
+            ("Ryan", "A-1", 1, 5.068),
+            ("Ryan", "A-1", 2, 5.070),
+            ("Ryan", "A-1", 3, 5.086),
+            ("Ryan", "A-2", 1, 5.192),
+            ("Ryan", "A-2", 2, 5.200),
+            ("Ryan", "A-2", 3, 5.206),
+            ("Sabrina", "B-1", 1, 5.094),
+            ("Sabrina", "B-1", 2, 5.103),
+            ("Sabrina", "B-1", 3, 5.096),
+            ("Sabrina", "B-2", 1, 5.196),
+            ("Sabrina", "B-2", 2, 5.189),
+            ("Sabrina", "B-2", 3, 5.196),
+            ("Cornelius", "C-1", 1, 5.090),
+            ("Cornelius", "C-1", 2, 5.084),
+            ("Cornelius", "C-1", 3, 5.091),
+            ("Cornelius", "C-2", 1, 5.212),
+            ("Cornelius", "C-2", 2, 5.224),
+            ("Cornelius", "C-2", 3, 5.217),
+        ],
+        columns=["Operator", "Part", "Trial", "Value"],
+    )
+    df["Operator"] = df["Operator"].astype("category")
+    df["Part"] = df["Part"].astype("category")
+    results = create_valid_results(n_operators=3, n_parts=2, n_trials=3)
+
+    charts = generateplots(df, results)
+
+    assert_charts(charts)
+
+
 def test_type1_run_chart_valid_input():
     control_chart_df = create_valid_type1_control_chart_df()
     chart = generate_type1_run_chart(control_chart_df)
@@ -183,3 +263,75 @@ def test_type1_run_chart_missing_required_column():
     control_chart_df = create_valid_type1_control_chart_df().drop(columns=["UCL"])
     with pytest.raises(ValueError):
         generate_type1_run_chart(control_chart_df)
+
+
+def test_variance_chart_groups_contribution_and_study_var_without_tolerance():
+    charts = generateplots(create_valid_df(), create_valid_results())
+    spec = charts["variance_histogram"].to_dict()
+    metric_scale = spec["encoding"]["color"]["scale"]
+
+    assert metric_scale["domain"] == ["% Contribution", "% Study Var"]
+    assert "% Tolerance" not in metric_scale["domain"]
+
+    values = spec["datasets"][spec["data"]["name"]]
+    metrics = {row["Metric"] for row in values}
+    components = {row["Component"] for row in values}
+
+    assert metrics == {"% Contribution", "% Study Var"}
+    assert components == {"Gage R&R", "Repeat", "Reprod", "Part-to-Part"}
+
+
+def test_variance_chart_adds_tolerance_only_when_percent_tolerance_exists():
+    results = create_valid_results()
+    results["variance_components"]["PercentTolerance"] = [42, 33, 65, 54, 85]
+
+    charts = generateplots(create_valid_df(), results)
+    spec = charts["variance_histogram"].to_dict()
+    metric_scale = spec["encoding"]["color"]["scale"]
+
+    assert metric_scale["domain"] == ["% Contribution", "% Study Var", "% Tolerance"]
+
+    values = spec["datasets"][spec["data"]["name"]]
+    assert "% Tolerance" in {row["Metric"] for row in values}
+
+
+def test_operator_boxplot_uses_horizontal_labels_and_professional_style():
+    charts = generateplots(create_valid_df(), create_valid_results())
+    spec = charts["operator_boxplot"].to_dict()
+
+    assert spec["mark"]["type"] == "boxplot"
+    assert spec["mark"]["color"] == "#4C78A8"
+    assert spec["mark"]["size"] == spec["mark"]["ticks"]["size"]
+    assert spec["encoding"]["x"]["axis"]["labelAngle"] == 0
+    assert spec["encoding"]["y"]["axis"]["grid"] is True
+    assert spec["title"] == "Measurement Distribution by Operator"
+
+
+def assert_black_text_config(chart):
+    spec = chart.to_dict()
+    assert spec["config"]["axis"]["labelColor"] == "black"
+    assert spec["config"]["axis"]["titleColor"] == "black"
+    assert spec["config"]["legend"]["labelColor"] == "black"
+    assert spec["config"]["legend"]["titleColor"] == "black"
+    assert spec["config"]["title"]["color"] == "black"
+
+
+def test_all_generateplots_charts_use_black_axis_legend_and_title_text():
+    charts = generateplots(create_valid_df(), create_valid_results())
+
+    for chart in charts.values():
+        assert_black_text_config(chart)
+
+
+def test_type1_run_chart_uses_black_axis_title_and_spec_label_text():
+    control_chart_df = create_valid_type1_control_chart_df()
+    chart = generate_type1_run_chart(
+        control_chart_df,
+        reference_value=10.0,
+        tolerance=1.0,
+    )
+    assert_black_text_config(chart)
+
+    spec = chart.to_dict()
+    spec_label_layer = spec["layer"][-1]
+    assert spec_label_layer["mark"]["color"] == "black"

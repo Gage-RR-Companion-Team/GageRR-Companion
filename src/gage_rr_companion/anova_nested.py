@@ -95,14 +95,14 @@ def ComputeANOVA_Nested(
 
     # Parts per operator (assume balanced)
     p = int(
-        data.groupby(operator_col)[part_col]
+        data.groupby(operator_col, observed=True)[part_col]
         .nunique()
         .mean()
     )
 
     # Trials per part
     r = int(
-        data.groupby([operator_col, part_col])[trial_col]
+        data.groupby([operator_col, part_col], observed=True)[trial_col]
         .nunique()
         .mean()
     )
@@ -113,10 +113,10 @@ def ComputeANOVA_Nested(
     grand_mean = data[value_col].mean()
 
     # Operator means
-    operator_means = data.groupby(operator_col)[value_col].mean()
+    operator_means = data.groupby(operator_col, observed=True)[value_col].mean()
 
     # Part means (nested within operator)
-    part_means = data.groupby([operator_col, part_col])[value_col].mean()
+    part_means = data.groupby([operator_col, part_col], observed=True)[value_col].mean()
 
     # Total SS
     SS_total = ((data[value_col] - grand_mean) ** 2).sum()
