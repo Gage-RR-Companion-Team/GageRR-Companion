@@ -115,7 +115,7 @@ def test_model_presets_use_backend_specific_defaults(monkeypatch):
 
     assert cornelius.get_model_id() == "Qwen/Qwen2.5-Coder-3B-Instruct"
     assert cornelius.get_openai_compatible_model_id() == "gemma-4-31b"
-    assert cornelius.get_llama_cpp_repo_id() == "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF"
+    assert cornelius.get_llama_cpp_repo_id() == "Qwen/Qwen2.5-7B-Instruct-GGUF"
 
 
 def test_openai_compatible_model_can_be_configured(monkeypatch):

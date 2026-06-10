@@ -58,7 +58,13 @@ This program requires Python 3.12 or higher.
 Navigate to the top-level folder of the project and run:
 
 ```
-pip install -e .
+pip install -e ".[local]" --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+```
+
+Download the default local Cornelius model:
+
+```
+gage_rr_companion download-local-model
 ```
 
 Then in the same terminal instance run:
@@ -68,7 +74,8 @@ gage_rr_companion
 ```
 
 This will launch a local web app accessible through the link provided 
-in the terminal.
+in the terminal. A `.streamlit/secrets.toml` file is only needed if you
+want to add private API keys or override the default model settings.
 
 For detailed installation instructions including conda setup and AI 
 chatbot configuration, see the 
